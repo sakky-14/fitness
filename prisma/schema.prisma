@@ -1,0 +1,107 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum Currency {
+  LAK
+  THB
+  USD
+}
+
+enum PaymentMethod {
+  CASH
+  BCEL_ONE_QR
+}
+
+enum ExpenseCategory {
+  SUPPLIES
+  UTILITIES
+  MAINTENANCE
+  MISCELLANEOUS
+}
+
+// 1. พนักงาน / ผู้จัดการยิม (Auth & Staff)
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  phone        String    @unique
+  passwordHash String
+  role         Role      @default(STAFF)
+  payments     Payment[]
+  expenses     Expense[]
+}
+
+// 2. แพ็กเกจยิม (รายวัน, บุฟเฟต์รายเดือน, คูปองนับครั้ง)
+model Package {
+  id           Int      @id @default(autoincrement())
+  name         String
+  priceLak     Decimal  @db.Decimal(12, 2)
+  durationDays Int?
+  sessions     Int?
+  members      Member[]
+}
+
+// 3. สมาชิกยิม และสิทธิ์การเข้าใช้งาน (Member & Access)
+model Member {
+  id                Int       @id @default(autoincrement())
+  code              String    @unique
+  fullName          String
+  phone             String    @unique
+  photoUrl          String?
+  packageId         Int?
+  expireDate        DateTime?
+  remainingSessions Int?      @default(0)
+  lastCheckIn       DateTime?
+  createdAt         DateTime  @default(now())
+
+  package  Package?  @relation(fields: [packageId], references: [id])
+  payments Payment[]
+}
+
+// 4. บันทึกการรับเงินทุกประเภท (Payments & Multi-Currency)
+model Payment {
+  id            Int           @id @default(autoincrement())
+  staffId       Int
+  memberId      Int?
+  description   String
+  amountLak     Decimal       @db.Decimal(12, 2)
+  paidCurrency  Currency      @default(LAK)
+  exchangeRate  Decimal       @default(1) @db.Decimal(10, 2)
+  amountPaid    Decimal       @db.Decimal(12, 2)
+  changeLak     Decimal       @default(0) @db.Decimal(12, 2)
+  paymentMethod PaymentMethod @default(CASH)
+  createdAt     DateTime      @default(now())
+
+  staff  User    @relation(fields: [staffId], references: [id])
+  member Member? @relation(fields: [memberId], references: [id])
+}
+
+// 5. บันทึกรายจ่ายหน้าร้านและเงินสดย่อย (Expense & Petty Cash)
+model Expense {
+  id           Int             @id @default(autoincrement())
+  staffId      Int
+  title        String
+  category     ExpenseCategory @default(SUPPLIES)
+  amountLak    Decimal         @db.Decimal(12, 2)
+  paidCurrency Currency        @default(LAK)
+  exchangeRate Decimal         @default(1) @db.Decimal(10, 2)
+  amountPaid   Decimal         @db.Decimal(12, 2)
+  receiptUrl   String?
+  createdAt    DateTime        @default(now())
+
+  staff User @relation(fields: [staffId], references: [id])
+}
