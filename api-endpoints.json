@@ -1,483 +1,847 @@
 {
-  "project": "Gym Management API",
-  "baseUrl": "http://localhost:3000",
-  "version": "1.0.0",
-  "authentication": "Bearer JWT Token (Authorization: Bearer <token>)",
-  "modules": [
+  "info": {
+    "_postman_id": "8f2a1b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+    "name": "Gym Management API",
+    "description": "Gym Management API Collection - Ready for Postman Import\n\n### Key Features:\n- **Auto Authentication**: Logging in automatically saves `access_token` to `{{token}}` variable.\n- **Bearer Token**: All protected endpoints inherit Bearer Token from collection auth.\n- **Base URL**: Managed via `{{baseUrl}}` variable (Default: http://localhost:3000).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
     {
-      "module": "Auth",
-      "basePath": "/auth",
-      "endpoints": [
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
         {
-          "id": "auth-login",
-          "method": "POST",
-          "path": "/auth/login",
-          "description": "Login ເຂົ້າສູ່ລະບົບ — ຄືນ JWT Token",
-          "auth": false,
-          "roles": [],
-          "body": {
-            "phone": "string (required) — ເບີໂທ / Username",
-            "password": "string (required) — ລະຫັດຜ່ານ"
-          },
-          "response": {
-            "access_token": "string — JWT Token",
-            "user": {
-              "id": "number",
-              "name": "string",
-              "phone": "string",
-              "role": "ADMIN | STAFF"
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set(\"token\", jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
-          }
-        },
-        {
-          "id": "auth-me",
-          "method": "GET",
-          "path": "/auth/me",
-          "description": "ດຶງຂໍ້ມູນ Profile ຂອງ Token ປັດຈຸບັນ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": null,
-          "response": {
-            "id": "number",
-            "name": "string",
-            "phone": "string",
-            "role": "ADMIN | STAFF"
-          }
-        }
-      ]
-    },
-    {
-      "module": "Users (Staff Management)",
-      "basePath": "/users",
-      "endpoints": [
-        {
-          "id": "users-create",
-          "method": "POST",
-          "path": "/users",
-          "description": "ສ້າງ Staff / Admin ໃໝ່",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "body": {
-            "name": "string (required)",
-            "phone": "string (required) — ໃຊ້ເປັນ Username",
-            "password": "string (required)",
-            "role": "ADMIN | STAFF (optional, default: STAFF)"
-          },
-          "response": { "id": "number", "name": "string", "phone": "string", "role": "string" }
-        },
-        {
-          "id": "users-findAll",
-          "method": "GET",
-          "path": "/users",
-          "description": "ດຶງລາຍຊື່ Staff ທັງໝົດ",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "body": null,
-          "response": "array of { id, name, phone, role }"
-        },
-        {
-          "id": "users-findOne",
-          "method": "GET",
-          "path": "/users/:id",
-          "description": "ດຶງຂໍ້ມູນ Staff ຕາມ ID",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": { "id": "number", "name": "string", "phone": "string", "role": "string" }
-        },
-        {
-          "id": "users-update",
-          "method": "PATCH",
-          "path": "/users/:id",
-          "description": "ແກ້ໄຂຂໍ້ມູນ Staff",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "params": { "id": "number" },
-          "body": {
-            "name": "string (optional)",
-            "phone": "string (optional)",
-            "password": "string (optional)",
-            "role": "ADMIN | STAFF (optional)"
-          },
-          "response": { "id": "number", "name": "string", "phone": "string", "role": "string" }
-        },
-        {
-          "id": "users-remove",
-          "method": "DELETE",
-          "path": "/users/:id",
-          "description": "ລົບ Staff ອອກຈາກລະບົບ",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": { "id": "number", "name": "string" }
-        }
-      ]
-    },
-    {
-      "module": "Members",
-      "basePath": "/members",
-      "endpoints": [
-        {
-          "id": "members-checkIn",
-          "method": "POST",
-          "path": "/members/check-in",
-          "description": "Scan QR/Barcode Check-in — Anti-Passback 15 ນາທີ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": { "code": "string (required) — ລະຫັດບັດສະມາຊິກ" },
-          "response": {
-            "message": "string",
-            "status": "SUCCESS",
-            "member": {
-              "id": "number",
-              "fullName": "string",
-              "code": "string",
-              "photoUrl": "string | null",
-              "packageName": "string",
-              "remainingSessions": "number | null",
-              "expireDate": "datetime | null",
-              "lastCheckIn": "datetime"
-            }
-          },
-          "errors": [
-            "404 — ບໍ່ພົບລະຫັດບັດ",
-            "400 — Anti-Passback: ລໍຖ້າ N ນາທີ",
-            "400 — ແພັກເກັດໝົດອາຍຸ",
-            "400 — ຈຳນວນຄັ້ງໝົດ"
-          ]
-        },
-        {
-          "id": "members-create",
-          "method": "POST",
-          "path": "/members",
-          "description": "ລົງທະບຽນສະມາຊິກໃໝ່",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": {
-            "code": "string (required) — ລະຫັດບັດ / Barcode",
-            "fullName": "string (required)",
-            "phone": "string (required)",
-            "photoUrl": "string (optional)",
-            "packageId": "number (optional)",
-            "expireDate": "string ISO date (optional) — YYYY-MM-DD",
-            "remainingSessions": "number (optional, default: 0)"
-          },
-          "response": "Member object with package relation"
-        },
-        {
-          "id": "members-findAll",
-          "method": "GET",
-          "path": "/members",
-          "description": "ດຶງລາຍຊື່ສະມາຊິກທັງໝົດ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": null,
-          "response": "array of Member objects with package"
-        },
-        {
-          "id": "members-findOne",
-          "method": "GET",
-          "path": "/members/:id",
-          "description": "ດຶງຂໍ້ມູນສະມາຊິກຕາມ ID",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Member object with package"
-        },
-        {
-          "id": "members-update",
-          "method": "PATCH",
-          "path": "/members/:id",
-          "description": "ແກ້ໄຂຂໍ້ມູນສະມາຊິກ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": {
-            "code": "string (optional)",
-            "fullName": "string (optional)",
-            "phone": "string (optional)",
-            "photoUrl": "string (optional)",
-            "packageId": "number (optional)",
-            "expireDate": "string ISO date (optional)",
-            "remainingSessions": "number (optional)"
-          },
-          "response": "Updated Member object with package"
-        },
-        {
-          "id": "members-remove",
-          "method": "DELETE",
-          "path": "/members/:id",
-          "description": "ລົບສະມາຊິກ (ADMIN Only)",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Deleted Member object"
-        }
-      ]
-    },
-    {
-      "module": "Packages",
-      "basePath": "/packages",
-      "endpoints": [
-        {
-          "id": "packages-create",
-          "method": "POST",
-          "path": "/packages",
-          "description": "ສ້າງແພັກເກັດໃໝ່",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "body": {
-            "name": "string (required) — ຊື່ແພັກເກັດ",
-            "priceLak": "number (required) — ລາຄາ (ກີບ)",
-            "durationDays": "number (optional) — ຈຳນວນວັນ",
-            "sessions": "number (optional) — ຈຳນວນຄັ້ງ (ຄູປອງ)"
-          },
-          "response": "Package object"
-        },
-        {
-          "id": "packages-findAll",
-          "method": "GET",
-          "path": "/packages",
-          "description": "ດຶງລາຍການແພັກເກັດທັງໝົດ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": null,
-          "response": "array of Package objects"
-        },
-        {
-          "id": "packages-findOne",
-          "method": "GET",
-          "path": "/packages/:id",
-          "description": "ດຶງຂໍ້ມູນແພັກເກັດຕາມ ID",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Package object"
-        },
-        {
-          "id": "packages-update",
-          "method": "PATCH",
-          "path": "/packages/:id",
-          "description": "ແກ້ໄຂຂໍ້ມູນແພັກເກັດ",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "params": { "id": "number" },
-          "body": {
-            "name": "string (optional)",
-            "priceLak": "number (optional)",
-            "durationDays": "number (optional)",
-            "sessions": "number (optional)"
-          },
-          "response": "Updated Package object"
-        },
-        {
-          "id": "packages-remove",
-          "method": "DELETE",
-          "path": "/packages/:id",
-          "description": "ລົບແພັກເກັດ",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Deleted Package object"
-        }
-      ]
-    },
-    {
-      "module": "Payments",
-      "basePath": "/payments",
-      "notes": "ເມື່ອສ້າງ Payment ພ້ອມ memberId + packageId ລະບົບຈະອັບເດດ expireDate ຫຼື remainingSessions ອັດໂນມັດ",
-      "endpoints": [
-        {
-          "id": "payments-create",
-          "method": "POST",
-          "path": "/payments",
-          "description": "ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກອັດໂນມັດ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "note": "staffId ດຶງອັດໂນມັດຈາກ JWT Token",
-          "body": {
-            "memberId": "number (optional) — ID ສະມາຊິກ",
-            "packageId": "number (optional) — ID ແພັກເກັດທີ່ຊື້",
-            "description": "string (required) — ລາຍລະອຽດ",
-            "amountLak": "number (required) — ຍອດລວມ (ກີບ)",
-            "paidCurrency": "LAK | THB | USD (optional, default: LAK)",
-            "exchangeRate": "number (optional, default: 1)",
-            "amountPaid": "number (required) — ຈຳນວນເງິນທີ່ຈ່າຍຕາມ Currency",
-            "changeLak": "number (optional, default: 0) — ເງິນທອນ (ກີບ)",
-            "paymentMethod": "CASH | BCEL_ONE_QR (optional, default: CASH)"
-          },
-          "response": "Payment object with staff and member info"
-        },
-        {
-          "id": "payments-findAll",
-          "method": "GET",
-          "path": "/payments",
-          "description": "ດຶງປະຫວັດການຊຳລະເງິນທັງໝົດ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": null,
-          "response": "array of Payment objects (desc by createdAt)"
-        },
-        {
-          "id": "payments-findOne",
-          "method": "GET",
-          "path": "/payments/:id",
-          "description": "ດຶງໃບບິນຕາມ ID",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Payment object with staff and member info"
-        }
-      ]
-    },
-    {
-      "module": "Expenses",
-      "basePath": "/expenses",
-      "endpoints": [
-        {
-          "id": "expenses-create",
-          "method": "POST",
-          "path": "/expenses",
-          "description": "ບັນທຶກລາຍຈ່າຍໃໝ່",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "note": "staffId ດຶງອັດໂນມັດຈາກ JWT Token",
-          "body": {
-            "title": "string (required) — ຫົວຂໍ້ລາຍຈ່າຍ",
-            "category": "SUPPLIES | UTILITIES | MAINTENANCE | MISCELLANEOUS (optional, default: SUPPLIES)",
-            "amountLak": "number (required) — ຍອດລວມ (ກີບ)",
-            "paidCurrency": "LAK | THB | USD (optional, default: LAK)",
-            "exchangeRate": "number (optional, default: 1)",
-            "amountPaid": "number (required) — ຈຳນວນເງິນທີ່ຈ່າຍຕາມ Currency",
-            "receiptUrl": "string (optional) — ລິ້ງຮູບໃບເສັດ"
-          },
-          "response": "Expense object with staff info"
-        },
-        {
-          "id": "expenses-findAll",
-          "method": "GET",
-          "path": "/expenses",
-          "description": "ດຶງລາຍການລາຍຈ່າຍທັງໝົດ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "body": null,
-          "response": "array of Expense objects (desc by createdAt)"
-        },
-        {
-          "id": "expenses-findOne",
-          "method": "GET",
-          "path": "/expenses/:id",
-          "description": "ດຶງລາຍຈ່າຍຕາມ ID",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Expense object with staff info"
-        },
-        {
-          "id": "expenses-update",
-          "method": "PATCH",
-          "path": "/expenses/:id",
-          "description": "ແກ້ໄຂລາຍຈ່າຍ",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "params": { "id": "number" },
-          "body": {
-            "title": "string (optional)",
-            "category": "SUPPLIES | UTILITIES | MAINTENANCE | MISCELLANEOUS (optional)",
-            "amountLak": "number (optional)",
-            "paidCurrency": "LAK | THB | USD (optional)",
-            "exchangeRate": "number (optional)",
-            "amountPaid": "number (optional)",
-            "receiptUrl": "string (optional)"
-          },
-          "response": "Updated Expense object with staff info"
-        },
-        {
-          "id": "expenses-remove",
-          "method": "DELETE",
-          "path": "/expenses/:id",
-          "description": "ລົບລາຍຈ່າຍ (ADMIN Only)",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "params": { "id": "number" },
-          "body": null,
-          "response": "Deleted Expense object"
-        }
-      ]
-    },
-    {
-      "module": "Reports",
-      "basePath": "/reports",
-      "endpoints": [
-        {
-          "id": "reports-financial",
-          "method": "GET",
-          "path": "/reports/financial",
-          "description": "ລາຍງານການເງິນ (ກຳໄລ-ຂາດທຶນ) — ADMIN Only",
-          "auth": true,
-          "roles": ["ADMIN"],
-          "query": {
-            "startDate": "string ISO date (optional) — YYYY-MM-DD (default: ວັນທີ 1 ຂອງເດືອນ)",
-            "endDate": "string ISO date (optional) — YYYY-MM-DD (default: ມື້ນີ້)"
-          },
-          "response": {
-            "period": { "startDate": "datetime", "endDate": "datetime" },
-            "summary": {
-              "totalIncome": "number",
-              "totalExpense": "number",
-              "netProfit": "number",
-              "status": "PROFIT | LOSS",
-              "transactionCounts": { "payments": "number", "expenses": "number" }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
             },
-            "incomeByMethod": "array grouped by paymentMethod",
-            "expenseByCategory": "array grouped by category"
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"02012345678\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login ເຂົ້າສູ່ລະບົບ — ຄືນ JWT Token (ບັນທຶກ access_token ເຂົ້າ variable {{token}} ອັດໂນມັດ)"
           }
         },
         {
-          "id": "reports-checkIns",
-          "method": "GET",
-          "path": "/reports/check-ins",
-          "description": "ລາຍງານສະຖິຕິສະມາຊິກ & Check-in",
-          "auth": true,
-          "roles": ["ADMIN", "STAFF"],
-          "query": {
-            "startDate": "string ISO date (optional) — YYYY-MM-DD",
-            "endDate": "string ISO date (optional) — YYYY-MM-DD"
-          },
-          "response": {
-            "period": { "startDate": "datetime", "endDate": "datetime" },
-            "stats": {
-              "totalCheckInsInPeriod": "number",
-              "totalMembers": "number",
-              "activeMembers": "number",
-              "expiringSoonCount": "number"
+          "name": "Get Current User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
             },
-            "expiringSoonMembers": "array of members expiring within 7 days"
+            "description": "ດຶງຂໍ້ມູນ Profile ຂອງ Token ປັດຈຸບັນ (ADMIN, STAFF)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users (Staff Management)",
+      "item": [
+        {
+          "name": "Create Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"phone\": \"02099998888\",\n  \"password\": \"password123\",\n  \"role\": \"STAFF\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "ສ້າງ Staff / Admin ໃໝ່ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get All Staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "ດຶງລາຍຊື່ Staff ທັງໝົດ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get Staff by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Staff ID"
+                }
+              ]
+            },
+            "description": "ດຶງຂໍ້ມູນ Staff ຕາມ ID (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Update Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"phone\": \"02099998888\",\n  \"role\": \"STAFF\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Staff ID"
+                }
+              ]
+            },
+            "description": "ແກ້ໄຂຂໍ້ມູນ Staff (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Delete Staff",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Staff ID"
+                }
+              ]
+            },
+            "description": "ລົບ Staff ອອກຈາກລະບົບ (ADMIN Only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Members",
+      "item": [
+        {
+          "name": "Check-In Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"MEM001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/members/check-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "check-in"
+              ]
+            },
+            "description": "Scan QR/Barcode Check-in — Anti-Passback 15 ນາທີ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Register Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"MEM001\",\n  \"fullName\": \"Somchai\",\n  \"phone\": \"02055554444\",\n  \"photoUrl\": \"http://example.com/photo.jpg\",\n  \"packageId\": 1,\n  \"expireDate\": \"2026-12-31\",\n  \"remainingSessions\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "description": "ລົງທະບຽນສະມາຊິກໃໝ່ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get All Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "description": "ດຶງລາຍຊື່ສະມາຊິກທັງໝົດ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get Member by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Member ID"
+                }
+              ]
+            },
+            "description": "ດຶງຂໍ້ມູນສະມາຊິກຕາມ ID (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Update Member",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Somchai Updated\",\n  \"phone\": \"02055554444\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/members/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Member ID"
+                }
+              ]
+            },
+            "description": "ແກ້ໄຂຂໍ້ມູນສະມາຊິກ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Delete Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Member ID"
+                }
+              ]
+            },
+            "description": "ລົບສະມາຊິກ (ADMIN Only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Packages",
+      "item": [
+        {
+          "name": "Create Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Monthly Pass\",\n  \"priceLak\": 350000,\n  \"durationDays\": 30,\n  \"sessions\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages"
+              ]
+            },
+            "description": "ສ້າງແພັກເກັດໃໝ່ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get All Packages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages"
+              ]
+            },
+            "description": "ດຶງລາຍການແພັກເກັດທັງໝົດ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get Package by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packages/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Package ID"
+                }
+              ]
+            },
+            "description": "ດຶງຂໍ້ມູນແພັກເກັດຕາມ ID (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Update Package",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"VIP Monthly Pass\",\n  \"priceLak\": 400000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/packages/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Package ID"
+                }
+              ]
+            },
+            "description": "ແກ້ໄຂຂໍ້ມູນແພັກເກັດ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Delete Package",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/packages/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Package ID"
+                }
+              ]
+            },
+            "description": "ລົບແພັກເກັດ (ADMIN Only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": 1,\n  \"packageId\": 1,\n  \"description\": \"ຊຳລະຄ່າແພັກເກັດ 1 ເດືອນ\",\n  \"amountLak\": 350000,\n  \"paidCurrency\": \"LAK\",\n  \"exchangeRate\": 1,\n  \"amountPaid\": 350000,\n  \"changeLak\": 0,\n  \"paymentMethod\": \"CASH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "description": "ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກອັດໂນມັດ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get All Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "description": "ດຶງປະຫວັດການຊຳລະເງິນທັງໝົດ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get Payment by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Payment ID"
+                }
+              ]
+            },
+            "description": "ດຶງໃບບິນຕາມ ID (ADMIN, STAFF)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "item": [
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"ຄ່ານ້ຳປະປາ\",\n  \"category\": \"UTILITIES\",\n  \"amountLak\": 150000,\n  \"paidCurrency\": \"LAK\",\n  \"exchangeRate\": 1,\n  \"amountPaid\": 150000,\n  \"receiptUrl\": \"http://example.com/receipt.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses"
+              ]
+            },
+            "description": "ບັນທຶກລາຍຈ່າຍໃໝ່ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get All Expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses"
+              ]
+            },
+            "description": "ດຶງລາຍການລາຍຈ່າຍທັງໝົດ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Get Expense by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Expense ID"
+                }
+              ]
+            },
+            "description": "ດຶງລາຍຈ່າຍຕາມ ID (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"ຄ່ານ້ຳປະປາ ແລະ ຄ່າໄຟ\",\n  \"amountLak\": 200000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Expense ID"
+                }
+              ]
+            },
+            "description": "ແກ້ໄຂລາຍຈ່າຍ (ADMIN, STAFF)"
+          }
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Expense ID"
+                }
+              ]
+            },
+            "description": "ລົບລາຍຈ່າຍ (ADMIN Only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Get Financial Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/financial?startDate=2026-09-01&endDate=2026-09-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "financial"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "description": "YYYY-MM-DD (default: ວັນທີ 1 ຂອງເດືອນ)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "description": "YYYY-MM-DD (default: ມື້ນີ້)"
+                }
+              ]
+            },
+            "description": "ລາຍງານການເງິນ (ກຳໄລ-ຂາດທຶນ) — ADMIN Only"
+          }
+        },
+        {
+          "name": "Get Check-Ins & Member Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/check-ins?startDate=2026-09-01&endDate=2026-09-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "check-ins"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01",
+                  "description": "YYYY-MM-DD"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30",
+                  "description": "YYYY-MM-DD"
+                }
+              ]
+            },
+            "description": "ລາຍງານສະຖິຕິສະມາຊິກ & Check-in (ADMIN, STAFF)"
           }
         }
       ]
     }
-  ],
-  "enums": {
-    "Role": ["ADMIN", "STAFF"],
-    "Currency": ["LAK", "THB", "USD"],
-    "PaymentMethod": ["CASH", "BCEL_ONE_QR"],
-    "ExpenseCategory": ["SUPPLIES", "UTILITIES", "MAINTENANCE", "MISCELLANEOUS"]
-  },
-  "summary": {
-    "totalModules": 7,
-    "totalEndpoints": 22,
-    "publicEndpoints": 1,
-    "protectedEndpoints": 21,
-    "adminOnlyEndpoints": 10,
-    "adminAndStaffEndpoints": 11
-  }
+  ]
 }
