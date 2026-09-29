@@ -1,9 +1,10 @@
 import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer'; // 👈 1. Import Type
 
 export class CreateMemberDto {
     @IsString()
     @IsNotEmpty()
-    code: string; // ລະຫັດບັດສະມາຊິກ / Barcode / QR Code
+    code: string;
 
     @IsString()
     @IsNotEmpty()
@@ -19,6 +20,7 @@ export class CreateMemberDto {
 
     @IsInt()
     @IsOptional()
+    @Type(() => Number) // 👈 2. ແປງ packageId ເປັນ Number
     packageId?: number;
 
     @IsDateString()
@@ -28,5 +30,6 @@ export class CreateMemberDto {
     @IsInt()
     @IsOptional()
     @Min(0)
+    @Type(() => Number) // 👈 3. ແປງ remainingSessions ເປັນ Number
     remainingSessions?: number;
 }
