@@ -23,6 +23,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         }
 
         // Return ເອົາຂໍ້ມູນຜູ້ໃຊ້ໄປແປະໄວ້ໃນ req.user
-        return { userId: user.id, phone: user.phone, role: user.role, name: user.name };
+        return { id: user.id, userId: user.id, phone: user.phone, role: user.role, name: user.name };
     }
 }

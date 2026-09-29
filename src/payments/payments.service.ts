@@ -9,6 +9,9 @@ export class PaymentsService {
 
   // 1. ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກອັດໂນມັດ
   async create(staffId: number, dto: CreatePaymentDto) {
+    if (!staffId) {
+      throw new BadRequestException('ບໍ່ພົບຂໍ້ມູນພະນັກງານ (staffId)');
+    }
     return this.prisma.$transaction(async (tx) => {
       let member = null;
       let pkg = null;

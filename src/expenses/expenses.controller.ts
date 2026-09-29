@@ -14,7 +14,7 @@ export class ExpensesController {
 
   @Post()
   create(@Request() req: any, @Body() createExpenseDto: CreateExpenseDto) {
-    const staffId = req.user.id; // ດຶງ Staff ID ຈາກ JWT Token ອັດໂນມັດ
+    const staffId = req.user?.id || req.user?.userId; // ດຶງ Staff ID ຈາກ JWT Token ອັດໂນມັດ
     return this.expensesService.create(staffId, createExpenseDto);
   }
 

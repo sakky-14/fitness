@@ -11,7 +11,7 @@ export class PaymentsController {
 
   @Post()
   create(@Request() req: any, @Body() createPaymentDto: CreatePaymentDto) {
-    const staffId = req.user.id; // ດຶງ Staff ID ຈາກ JWT Token
+    const staffId = req.user?.id || req.user?.userId; // ດຶງ Staff ID ຈາກ JWT Token
     return this.paymentsService.create(staffId, createPaymentDto);
   }
 

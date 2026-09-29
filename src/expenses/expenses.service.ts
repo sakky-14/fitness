@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
@@ -10,6 +10,9 @@ export class ExpensesService {
 
   // 1. ບັນທຶກລາຍຈ່າຍໃໝ່
   async create(staffId: number, dto: CreateExpenseDto) {
+    if (!staffId) {
+      throw new BadRequestException('ບໍ່ພົບຂໍ້ມູນພະນັກງານ (staffId)');
+    }
     return this.prisma.expense.create({
       data: {
         staffId,
