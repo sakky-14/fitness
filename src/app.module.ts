@@ -12,6 +12,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
 
+
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -32,6 +33,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PaymentsModule,
     ExpensesModule,
     ReportsModule,
+
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

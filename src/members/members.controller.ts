@@ -5,6 +5,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { randomUUID } from 'crypto'; // 👈 1. Import randomUUID ເຂົ້າມາ (Built-in ຂອງ Node.js)
 import { MembersService } from './members.service';
 import { CreateMemberDto } from './dto/create-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
@@ -14,17 +15,17 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
-// ⚙️ ຕັ້ງຄ່າ Multer + ເພີ່ມ Limit ຂະໜາດໄຟລ໌ຮູບ (10MB)
+// ⚙️ ຕັ້ງຄ່າ Multer + ໃຊ້ UUID ตั้งຊື່ໄຟລ໌
 const multerOptions = {
   limits: {
-    fileSize: 10 * 1024 * 1024, // 👈 10 MB per file
+    fileSize: 10 * 1024 * 1024, // 10 MB per file
   },
   storage: diskStorage({
     destination: './uploads/members',
     filename: (req, file, callback) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      const uuid = randomUUID(); // 👈 2. ສ້າງ UUID ເຊັ່ນ: "123e4567-e89b-12d3-a456-426614174000"
       const ext = extname(file.originalname);
-      callback(null, `member-${uniqueSuffix}${ext}`);
+      callback(null, `member-${uuid}${ext}`); // ຜົນລຶບຈະໄດ້: member-123e4567-e89b-12d3-a456-426614174000.jpg
     },
   }),
 };
@@ -34,13 +35,11 @@ const multerOptions = {
 export class MembersController {
   constructor(private readonly membersService: MembersService) { }
 
-  // Scan Check-in
   @Post('check-in')
   checkIn(@Body() checkInDto: CheckInDto) {
     return this.membersService.checkIn(checkInDto);
   }
 
-  // 📸 ເພີ່ມສະມາຊິກ + ອັບໂຫຼດຮູບພາບ (Key 'photo')
   @Post()
   @UseInterceptors(FileInterceptor('photo', multerOptions))
   create(
@@ -63,7 +62,6 @@ export class MembersController {
     return this.membersService.findOne(id);
   }
 
-  // 📸 ແກ້ໄຂສະມາຊິກ + ອັບໂຫຼດຮູບພາບໃໝ່
   @Patch(':id')
   @UseInterceptors(FileInterceptor('photo', multerOptions))
   update(
