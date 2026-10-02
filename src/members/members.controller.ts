@@ -14,8 +14,11 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
-// ⚙️ Config ການເກັບຮູບ
+// ⚙️ ຕັ້ງຄ່າ Multer + ເພີ່ມ Limit ຂະໜາດໄຟລ໌ຮູບ (10MB)
 const multerOptions = {
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 👈 10 MB per file
+  },
   storage: diskStorage({
     destination: './uploads/members',
     filename: (req, file, callback) => {
@@ -31,12 +34,13 @@ const multerOptions = {
 export class MembersController {
   constructor(private readonly membersService: MembersService) { }
 
+  // Scan Check-in
   @Post('check-in')
   checkIn(@Body() checkInDto: CheckInDto) {
     return this.membersService.checkIn(checkInDto);
   }
 
-  // 📸 ເພີ່ມ FileInterceptor ຮັບຮູບຢູ່ Create
+  // 📸 ເພີ່ມສະມາຊິກ + ອັບໂຫຼດຮູບພາບ (Key 'photo')
   @Post()
   @UseInterceptors(FileInterceptor('photo', multerOptions))
   create(
@@ -59,7 +63,7 @@ export class MembersController {
     return this.membersService.findOne(id);
   }
 
-  // 📸 ເພີ່ມ FileInterceptor ຮັບຮູບຢູ່ Update
+  // 📸 ແກ້ໄຂສະມາຊິກ + ອັບໂຫຼດຮູບພາບໃໝ່
   @Patch(':id')
   @UseInterceptors(FileInterceptor('photo', multerOptions))
   update(
