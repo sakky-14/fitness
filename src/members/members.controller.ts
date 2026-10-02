@@ -5,7 +5,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { randomUUID } from 'crypto'; // 👈 1. Import randomUUID ເຂົ້າມາ (Built-in ຂອງ Node.js)
+import * as crypto from 'crypto'; // 👈 1. Import ແບບນີ້
 import { MembersService } from './members.service';
 import { CreateMemberDto } from './dto/create-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
@@ -15,17 +15,19 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
-// ⚙️ ຕັ້ງຄ່າ Multer + ໃຊ້ UUID ตั้งຊື່ໄຟລ໌
 const multerOptions = {
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB per file
+    fileSize: 10 * 1024 * 1024, // 10MB
   },
   storage: diskStorage({
     destination: './uploads/members',
     filename: (req, file, callback) => {
-      const uuid = randomUUID(); // 👈 2. ສ້າງ UUID ເຊັ່ນ: "123e4567-e89b-12d3-a456-426614174000"
+      // 👈 2. ເອີ້ນໃຊ້ crypto.randomUUID()
+      const uuid = crypto.randomUUID();
       const ext = extname(file.originalname);
-      callback(null, `member-${uuid}${ext}`); // ຜົນລຶບຈະໄດ້: member-123e4567-e89b-12d3-a456-426614174000.jpg
+
+      // ຜົນລຶບຈະໄດ້: member-123e4567-e89b-12d3-a456-426614174000.png
+      callback(null, `member-${uuid}${ext}`);
     },
   }),
 };
