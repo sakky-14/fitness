@@ -25,7 +25,7 @@ export class MembersService {
     }
 
     const packageId = dto.packageId ? Number(dto.packageId) : null;
-    let calculatedRemainingSessions =
+    let calculatedRemainingSessions: number | null | undefined =
       dto.remainingSessions !== undefined && dto.remainingSessions !== null && (dto.remainingSessions as any) !== ''
         ? Number(dto.remainingSessions)
         : undefined;
@@ -41,7 +41,7 @@ export class MembersService {
 
       // ຖ້າไม่ได้ระบุ remainingSessions มา ให้คำนวณตาม Package (sessions หรือ durationDays: 1 วัน -> 1 ครั้ง, 30 วัน -> 30 ครั้ง, 365 วัน -> 365 ครั้ง)
       if (calculatedRemainingSessions === undefined || calculatedRemainingSessions === null || isNaN(calculatedRemainingSessions)) {
-        calculatedRemainingSessions = pkg.sessions ?? pkg.durationDays ?? 0;
+        calculatedRemainingSessions = pkg.sessions ?? null;
       }
 
       // ຖ້າไม่ได้ระบุ expireDate มา และ package มี durationDays ให้คำนวณวันหมดอายุ
@@ -52,7 +52,7 @@ export class MembersService {
         calculatedExpireDate = expire;
       }
     } else {
-      calculatedRemainingSessions = calculatedRemainingSessions ?? 0;
+      calculatedRemainingSessions = calculatedRemainingSessions ?? null;
     }
 
     return this.prisma.member.create({
@@ -107,7 +107,7 @@ export class MembersService {
       }
 
       if (dto.remainingSessions === undefined) {
-        dataToUpdate.remainingSessions = pkg.sessions ?? pkg.durationDays ?? 0;
+        dataToUpdate.remainingSessions = pkg.sessions ?? null;
       }
       if (!dto.expireDate && pkg.durationDays) {
         const now = new Date();
@@ -172,10 +172,11 @@ export class MembersService {
       throw new BadRequestException('ແພັກເກັດສະມາຊິກຂອງທ່ານ ໝົດອາຍຸແລ້ວ!');
     }
 
-    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ
-    const hasPackageLimit = member.package?.sessions || member.package?.durationDays || (member.remainingSessions !== null && member.remainingSessions !== undefined);
-    if (hasPackageLimit && (!member.remainingSessions || member.remainingSessions <= 0)) {
-      throw new BadRequestException('ຈຳນວນຄັ້ງໃນການເຂົ້າໃຊ້ງານຂອງທ່ານ ໝົດແລ້ວ!');
+    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ (ສະເພາະແພັກເກັດທີ່ມີ remainingSessions)
+    if (member.remainingSessions !== null && member.remainingSessions !== undefined) {
+      if (member.remainingSessions <= 0) {
+        throw new BadRequestException('ຈຳນວນຄັ້ງໃນການເຂົ້າໃຊ້ງານຂອງທ່ານ ໝົດແລ້ວ!');
+      }
     }
 
     // 🔄 [ACTION]: ອັບເດດຂໍ້ມູນການ Check-in
@@ -183,8 +184,8 @@ export class MembersService {
       lastCheckIn: now,
     };
 
-    // ຖ້າເປັນແພັກເກັດນັບຄັ້ງ ໃຫ້ຫັກອອກ 1 ຄັ້ງ
-    if (member.remainingSessions && member.remainingSessions > 0) {
+    // ຖ້າເປັນແພັກເກັດນັບຄັ້ງ (remainingSessions > 0) ໃຫ້ຫັກອອກ 1 ຄັ້ງ
+    if (member.remainingSessions !== null && member.remainingSessions !== undefined && member.remainingSessions > 0) {
       updateData.remainingSessions = member.remainingSessions - 1;
     }
 
@@ -193,6 +194,13 @@ export class MembersService {
       data: updateData,
       include: { package: true },
     });
+
+    // คำนวณจำนวนวันที่เหลือ (remainingDays) จาก expireDate
+    let remainingDays: number | null = null;
+    if (updatedMember.expireDate) {
+      const diffInMs = updatedMember.expireDate.getTime() - now.getTime();
+      remainingDays = Math.max(0, Math.floor(diffInMs / (1000 * 60 * 60 * 24)));
+    }
 
     return {
       message: 'Check-in ສຳເລັດ!',
@@ -204,6 +212,7 @@ export class MembersService {
         photoUrl: updatedMember.photoUrl,
         packageName: updatedMember.package?.name || 'N/A',
         remainingSessions: updatedMember.remainingSessions,
+        remainingDays: remainingDays,
         expireDate: updatedMember.expireDate,
         lastCheckIn: updatedMember.lastCheckIn,
       },
