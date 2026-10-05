@@ -48,19 +48,35 @@ async function uploadFileToSupabase(
   filename: string,
   contentType: string,
 ): Promise<string | null> {
-  if (!supabase) return null;
+  if (!supabase) {
+    console.warn('⚠️ Supabase client is not initialized. Please set SUPABASE_KEY in .env file.');
+    return null;
+  }
 
   try {
     const fileData = typeof filePathOrBuffer === 'string'
       ? fs.readFileSync(filePathOrBuffer)
       : filePathOrBuffer;
 
-    const { data, error } = await supabase.storage
+    let { data, error } = await supabase.storage
       .from(bucketName)
       .upload(filename, fileData, {
         contentType,
         upsert: true,
       });
+
+    if (error && (error.message.includes('not found') || error.message.includes('Bucket'))) {
+      console.log(`Bucket '${bucketName}' not found. Creating bucket...`);
+      await supabase.storage.createBucket(bucketName, { public: true });
+      const retry = await supabase.storage
+        .from(bucketName)
+        .upload(filename, fileData, {
+          contentType,
+          upsert: true,
+        });
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('Supabase Storage Upload Error:', error.message);
@@ -71,6 +87,7 @@ async function uploadFileToSupabase(
       .from(bucketName)
       .getPublicUrl(filename);
 
+    console.log('✅ Successfully uploaded to Supabase Storage:', publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
   } catch (err) {
     console.error('Supabase upload exception:', err);
