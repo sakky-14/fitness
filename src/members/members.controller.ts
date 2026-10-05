@@ -6,7 +6,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as crypto from 'crypto';
-import * as fs from 'fs'; // 👈 ເພີ່ມ fs ເພື່ອຈັດການຟາຍ
+import * as fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import { MembersService } from './members.service';
 import { CreateMemberDto } from './dto/create-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
@@ -27,13 +28,58 @@ const multerOptions = {
     filename: (req, file, callback) => {
       const uuid = crypto.randomUUID();
       const ext = extname(file.originalname);
-      callback(null, `${uuid}${ext}`); // ໄດ້ຊື່: 123e4567-e89b-12d3-a456-426614174000.png
+      callback(null, `${uuid}${ext}`);
     },
   }),
 };
 
-// 👈 ຟັງຊັນຊ່ວຍแปลง Base64 Data URL ໃຫ້ເປັນຟາຍ UUID
-function saveBase64Image(base64String: string): string {
+// ☁️ Initialize Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL || 'https://kxepuykhvqvjnooeoqcl.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY;
+const bucketName = process.env.SUPABASE_BUCKET || 'members';
+
+const supabase = (supabaseKey && supabaseKey !== 'YOUR_SUPABASE_KEY')
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
+
+// ☁️ Helper: Upload image buffer or file path to Supabase Storage
+async function uploadFileToSupabase(
+  filePathOrBuffer: string | Buffer,
+  filename: string,
+  contentType: string,
+): Promise<string | null> {
+  if (!supabase) return null;
+
+  try {
+    const fileData = typeof filePathOrBuffer === 'string'
+      ? fs.readFileSync(filePathOrBuffer)
+      : filePathOrBuffer;
+
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(filename, fileData, {
+        contentType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Supabase Storage Upload Error:', error.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filename);
+
+    return publicUrlData.publicUrl;
+  } catch (err) {
+    console.error('Supabase upload exception:', err);
+    return null;
+  }
+}
+
+// 👈 ຟັງຊັນຊ່ວຍແປງ Base64 Data URL ໃຫ້ເປັນຟາຍ UUID ແລະ ອັບໂຫລດໄປ Supabase Storage
+async function saveBase64Image(base64String: string): Promise<string> {
   if (!base64String || !base64String.startsWith('data:image/')) {
     return base64String;
   }
@@ -41,24 +87,38 @@ function saveBase64Image(base64String: string): string {
   const matches = base64String.match(/^data:image\/([a-zA-Z0-9\+\-\.]+);base64,([\s\S]+)$/);
   if (!matches) return base64String;
 
-  let ext = matches[1].toLowerCase();
-  if (ext === 'jpeg') {
-    ext = 'jpg';
-  } else if (ext.includes('+')) {
-    ext = ext.split('+')[0];
-  }
+  const rawType = matches[1].toLowerCase();
+  let ext = rawType === 'jpeg' ? 'jpg' : rawType.includes('+') ? rawType.split('+')[0] : rawType;
+  const contentType = `image/${rawType}`;
 
   const base64Data = matches[2].replace(/\s/g, '');
   const dataBuffer = Buffer.from(base64Data, 'base64');
   const uuid = crypto.randomUUID();
   const filename = `${uuid}.${ext}`;
 
+  // 1. บันทึกลง Disk ท้องถิ่น
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
+  const localPath = join(uploadDir, filename);
+  fs.writeFileSync(localPath, dataBuffer);
 
-  fs.writeFileSync(join(uploadDir, filename), dataBuffer);
-  return `/uploads/members/${filename}`;
+  // 2. อัปโหลดไปยัง Supabase Storage
+  const supabasePublicUrl = await uploadFileToSupabase(dataBuffer, filename, contentType);
+
+  return supabasePublicUrl || `/uploads/members/${filename}`;
+}
+
+// 👈 ຟັງຊັນຊ່ວຍອັບໂຫລດ Multipart File ໄປ Supabase Storage
+async function processUploadedFile(file: Express.Multer.File): Promise<string> {
+  const localUrl = `/uploads/members/${file.filename}`;
+  if (!file) return localUrl;
+
+  const contentType = file.mimetype || 'image/jpeg';
+  const filePath = file.path || join(uploadDir, file.filename);
+
+  const supabasePublicUrl = await uploadFileToSupabase(filePath, file.filename, contentType);
+  return supabasePublicUrl || localUrl;
 }
 
 @Controller('members')
@@ -73,16 +133,14 @@ export class MembersController {
 
   @Post()
   @UseInterceptors(FileInterceptor('photo', multerOptions))
-  create(
+  async create(
     @Body() createMemberDto: CreateMemberDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
-      // ຖ້າສົ່ງຟາຍມາແບບ multipart/form-data
-      createMemberDto.photoUrl = `/uploads/members/${file.filename}`;
+      createMemberDto.photoUrl = await processUploadedFile(file);
     } else if (createMemberDto.photoUrl) {
-      // ຖ້າ Frontend ສົ່ງ Base64 string ມາທາງ JSON body
-      createMemberDto.photoUrl = saveBase64Image(createMemberDto.photoUrl);
+      createMemberDto.photoUrl = await saveBase64Image(createMemberDto.photoUrl);
     }
     return this.membersService.create(createMemberDto);
   }
@@ -99,17 +157,15 @@ export class MembersController {
 
   @Patch(':id')
   @UseInterceptors(FileInterceptor('photo', multerOptions))
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateMemberDto: UpdateMemberDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
-      // ຖ້າສົ່ງຟາຍມາແບບ multipart/form-data
-      updateMemberDto.photoUrl = `/uploads/members/${file.filename}`;
+      updateMemberDto.photoUrl = await processUploadedFile(file);
     } else if (updateMemberDto.photoUrl) {
-      // ຖ້າ Frontend ສົ່ງ Base64 string ມາທາງ JSON body
-      updateMemberDto.photoUrl = saveBase64Image(updateMemberDto.photoUrl);
+      updateMemberDto.photoUrl = await saveBase64Image(updateMemberDto.photoUrl);
     }
     return this.membersService.update(id, updateMemberDto);
   }
