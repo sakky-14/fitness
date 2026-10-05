@@ -24,6 +24,33 @@ export class MembersService {
       throw new ConflictException('ເບີໂທລະສັບນີ້ມີໃນລະບົບແລ້ວ');
     }
 
+    let calculatedRemainingSessions = dto.remainingSessions;
+    let calculatedExpireDate = dto.expireDate ? new Date(dto.expireDate) : null;
+
+    if (dto.packageId) {
+      const pkg = await this.prisma.package.findUnique({
+        where: { id: dto.packageId },
+      });
+      if (!pkg) {
+        throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
+      }
+
+      // ຖ້າไม่ได้ระบุ remainingSessions มา ให้คำนวณตาม Package (sessions หรือ durationDays: 1 วัน -> 1 ครั้ง, 30 วัน -> 30 ครั้ง, 365 วัน -> 365 ครั้ง)
+      if (calculatedRemainingSessions === undefined || calculatedRemainingSessions === null) {
+        calculatedRemainingSessions = pkg.sessions ?? pkg.durationDays ?? 0;
+      }
+
+      // ຖ້າไม่ได้ระบุ expireDate มา และ package มี durationDays ให้คำนวณวันหมดอายุ
+      if (!calculatedExpireDate && pkg.durationDays) {
+        const now = new Date();
+        const expire = new Date(now);
+        expire.setDate(expire.getDate() + pkg.durationDays);
+        calculatedExpireDate = expire;
+      }
+    } else {
+      calculatedRemainingSessions = calculatedRemainingSessions ?? 0;
+    }
+
     return this.prisma.member.create({
       data: {
         code: dto.code,
@@ -31,8 +58,8 @@ export class MembersService {
         phone: dto.phone,
         photoUrl: dto.photoUrl,
         packageId: dto.packageId,
-        expireDate: dto.expireDate ? new Date(dto.expireDate) : null,
-        remainingSessions: dto.remainingSessions ?? 0,
+        expireDate: calculatedExpireDate,
+        remainingSessions: calculatedRemainingSessions,
       },
       include: { package: true },
     });
@@ -67,6 +94,25 @@ export class MembersService {
       dataToUpdate.expireDate = new Date(dto.expireDate);
     }
 
+    if (dto.packageId) {
+      const pkg = await this.prisma.package.findUnique({
+        where: { id: dto.packageId },
+      });
+      if (!pkg) {
+        throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
+      }
+
+      if (dto.remainingSessions === undefined) {
+        dataToUpdate.remainingSessions = pkg.sessions ?? pkg.durationDays ?? 0;
+      }
+      if (!dto.expireDate && pkg.durationDays) {
+        const now = new Date();
+        const expire = new Date(now);
+        expire.setDate(expire.getDate() + pkg.durationDays);
+        dataToUpdate.expireDate = expire;
+      }
+    }
+
     return this.prisma.member.update({
       where: { id },
       data: dataToUpdate,
@@ -82,7 +128,7 @@ export class MembersService {
     });
   }
 
-  // ⚡ 6. ລະບົບ Scan Check-in + Anti-Passback Logic (15 ນາທີ)
+  // ⚡ 6. ລະບົບ Scan Check-in + Anti-Passback Logic (1 ນາທີ)
   async checkIn(dto: CheckInDto) {
     const member = await this.prisma.member.findUnique({
       where: { code: dto.code },
@@ -95,11 +141,11 @@ export class MembersService {
 
     const now = new Date();
 
-    // 🛑 [CHECK 1]: Anti-Passback Cooldown (15 ນາທີ)
+    // 🛑 [CHECK 1]: Anti-Passback Cooldown (1 ນາທີ)
     if (member.lastCheckIn) {
       const diffInMs = now.getTime() - member.lastCheckIn.getTime();
       const diffInMinutes = diffInMs / (1000 * 60);
-      const COOLDOWN_MINUTES = 15;
+      const COOLDOWN_MINUTES = 1;
 
       if (diffInMinutes < COOLDOWN_MINUTES) {
         const remainingMinutes = Math.ceil(COOLDOWN_MINUTES - diffInMinutes);
@@ -114,8 +160,9 @@ export class MembersService {
       throw new BadRequestException('ແພັກເກັດສະມາຊິກຂອງທ່ານ ໝົດອາຍຸແລ້ວ!');
     }
 
-    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ (ກໍລະນີເປັນແພັກເກັດຄູປອງນັບຄັ້ງ)
-    if (member.package?.sessions && (!member.remainingSessions || member.remainingSessions <= 0)) {
+    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ
+    const hasPackageLimit = member.package?.sessions || member.package?.durationDays || (member.remainingSessions !== null && member.remainingSessions !== undefined);
+    if (hasPackageLimit && (!member.remainingSessions || member.remainingSessions <= 0)) {
       throw new BadRequestException('ຈຳນວນຄັ້ງໃນການເຂົ້າໃຊ້ງານຂອງທ່ານ ໝົດແລ້ວ!');
     }
 

@@ -73,10 +73,11 @@ export class PaymentsService {
           updateMemberData.expireDate = newExpireDate;
         }
 
-        // ຖ້າເປັນແພັກເກັດຄູປອງນັບຄັ້ງ (sessions) -> ບວກຈຳນວນຄັ້ງເພີ່ມ
-        if (pkg.sessions) {
-          const currentSessions = member.remainingSessions || 0;
-          updateMemberData.remainingSessions = currentSessions + pkg.sessions;
+        // ຖ້າເປັນແພັກເກັດ (sessions ຫຼື durationDays) -> ບວກຈຳນວນຄັ້ງເພີ່ມ (รายวัน = 1, รายเดือน = 30, รายปี = 365, หรือตาม sessions)
+        const sessionsToAdd = pkg.sessions ?? pkg.durationDays ?? 0;
+        if (sessionsToAdd > 0) {
+          const currentSessions = member.remainingSessions && member.remainingSessions > 0 ? member.remainingSessions : 0;
+          updateMemberData.remainingSessions = currentSessions + sessionsToAdd;
         }
 
         await tx.member.update({
