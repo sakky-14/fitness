@@ -4,33 +4,55 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
-import * as crypto from 'crypto'; // 👈 1. Import ແບບນີ້
+import { extname, join } from 'path';
+import * as crypto from 'crypto';
+import * as fs from 'fs'; // 👈 ເພີ່ມ fs ເພື່ອຈັດການຟາຍ
 import { MembersService } from './members.service';
 import { CreateMemberDto } from './dto/create-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 import { CheckInDto } from './dto/check-in.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+const uploadDir = './uploads/members';
 
 const multerOptions = {
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
   storage: diskStorage({
-    destination: './uploads/members',
+    destination: uploadDir,
     filename: (req, file, callback) => {
-      // 👈 2. ເອີ້ນໃຊ້ crypto.randomUUID()
       const uuid = crypto.randomUUID();
       const ext = extname(file.originalname);
-
-      // ຜົນລຶບຈະໄດ້: member-123e4567-e89b-12d3-a456-426614174000.png
-      callback(null, `member-${uuid}${ext}`);
+      callback(null, `${uuid}${ext}`); // ໄດ້ຊື່: 123e4567-e89b-12d3-a456-426614174000.png
     },
   }),
 };
+
+// 👈 ຟັງຊັນຊ່ວຍแปลง Base64 Data URL ໃຫ້ເປັນຟາຍ UUID
+function saveBase64Image(base64String: string): string {
+  if (!base64String || !base64String.startsWith('data:image/')) {
+    return base64String;
+  }
+
+  const matches = base64String.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+  if (!matches) return base64String;
+
+  const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+  const dataBuffer = Buffer.from(matches[2], 'base64');
+  const uuid = crypto.randomUUID();
+  const filename = `${uuid}.${ext}`;
+
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  fs.writeFileSync(join(uploadDir, filename), dataBuffer);
+  return `/uploads/members/${filename}`;
+}
 
 @Controller('members')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,7 +71,11 @@ export class MembersController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
+      // ຖ້າສົ່ງຟາຍມາແບບ multipart/form-data
       createMemberDto.photoUrl = `/uploads/members/${file.filename}`;
+    } else if (createMemberDto.photoUrl) {
+      // ຖ້າ Frontend ສົ່ງ Base64 string ມາທາງ JSON body
+      createMemberDto.photoUrl = saveBase64Image(createMemberDto.photoUrl);
     }
     return this.membersService.create(createMemberDto);
   }
@@ -72,7 +98,11 @@ export class MembersController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
+      // ຖ້າສົ່ງຟາຍມາແບບ multipart/form-data
       updateMemberDto.photoUrl = `/uploads/members/${file.filename}`;
+    } else if (updateMemberDto.photoUrl) {
+      // ຖ້າ Frontend ສົ່ງ Base64 string ມາທາງ JSON body
+      updateMemberDto.photoUrl = saveBase64Image(updateMemberDto.photoUrl);
     }
     return this.membersService.update(id, updateMemberDto);
   }
