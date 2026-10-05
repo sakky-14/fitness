@@ -38,11 +38,18 @@ function saveBase64Image(base64String: string): string {
     return base64String;
   }
 
-  const matches = base64String.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+  const matches = base64String.match(/^data:image\/([a-zA-Z0-9\+\-\.]+);base64,([\s\S]+)$/);
   if (!matches) return base64String;
 
-  const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-  const dataBuffer = Buffer.from(matches[2], 'base64');
+  let ext = matches[1].toLowerCase();
+  if (ext === 'jpeg') {
+    ext = 'jpg';
+  } else if (ext.includes('+')) {
+    ext = ext.split('+')[0];
+  }
+
+  const base64Data = matches[2].replace(/\s/g, '');
+  const dataBuffer = Buffer.from(base64Data, 'base64');
   const uuid = crypto.randomUUID();
   const filename = `${uuid}.${ext}`;
 
