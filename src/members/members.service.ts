@@ -24,19 +24,23 @@ export class MembersService {
       throw new ConflictException('ເບີໂທລະສັບນີ້ມີໃນລະບົບແລ້ວ');
     }
 
-    let calculatedRemainingSessions = dto.remainingSessions;
+    const packageId = dto.packageId ? Number(dto.packageId) : null;
+    let calculatedRemainingSessions =
+      dto.remainingSessions !== undefined && dto.remainingSessions !== null && (dto.remainingSessions as any) !== ''
+        ? Number(dto.remainingSessions)
+        : undefined;
     let calculatedExpireDate = dto.expireDate ? new Date(dto.expireDate) : null;
 
-    if (dto.packageId) {
+    if (packageId) {
       const pkg = await this.prisma.package.findUnique({
-        where: { id: dto.packageId },
+        where: { id: packageId },
       });
       if (!pkg) {
         throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
       }
 
       // ຖ້າไม่ได้ระบุ remainingSessions มา ให้คำนวณตาม Package (sessions หรือ durationDays: 1 วัน -> 1 ครั้ง, 30 วัน -> 30 ครั้ง, 365 วัน -> 365 ครั้ง)
-      if (calculatedRemainingSessions === undefined || calculatedRemainingSessions === null) {
+      if (calculatedRemainingSessions === undefined || calculatedRemainingSessions === null || isNaN(calculatedRemainingSessions)) {
         calculatedRemainingSessions = pkg.sessions ?? pkg.durationDays ?? 0;
       }
 
@@ -57,7 +61,7 @@ export class MembersService {
         fullName: dto.fullName,
         phone: dto.phone,
         photoUrl: dto.photoUrl,
-        packageId: dto.packageId,
+        packageId: packageId,
         expireDate: calculatedExpireDate,
         remainingSessions: calculatedRemainingSessions,
       },
@@ -76,7 +80,7 @@ export class MembersService {
   // 3. ດຶງຂໍ້ມູນສະມາຊິກຕາມ ID
   async findOne(id: number) {
     const member = await this.prisma.member.findUnique({
-      where: { id },
+      where: { id: Number(id) },
       include: { package: true },
     });
     if (!member) {
@@ -90,13 +94,13 @@ export class MembersService {
     await this.findOne(id);
 
     const dataToUpdate: any = { ...dto };
-    if (dto.expireDate) {
-      dataToUpdate.expireDate = new Date(dto.expireDate);
-    }
 
     if (dto.packageId) {
+      const packageId = Number(dto.packageId);
+      dataToUpdate.packageId = packageId;
+
       const pkg = await this.prisma.package.findUnique({
-        where: { id: dto.packageId },
+        where: { id: packageId },
       });
       if (!pkg) {
         throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
@@ -113,8 +117,16 @@ export class MembersService {
       }
     }
 
+    if (dto.remainingSessions !== undefined && dto.remainingSessions !== null && (dto.remainingSessions as any) !== '') {
+      dataToUpdate.remainingSessions = Number(dto.remainingSessions);
+    }
+
+    if (dto.expireDate) {
+      dataToUpdate.expireDate = new Date(dto.expireDate);
+    }
+
     return this.prisma.member.update({
-      where: { id },
+      where: { id: Number(id) },
       data: dataToUpdate,
       include: { package: true },
     });

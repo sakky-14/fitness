@@ -3,6 +3,7 @@ import { AppModule, ObserveInstrument } from './app.module';
 import "dotenv/config";
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express'; // 👈 Import ແປງ limit ຂະໜາດໄຟລ໌
 
 async function bootstrap() {
@@ -13,6 +14,14 @@ async function bootstrap() {
   // ⚙️ ເພີ່ມ Limit ຂະໜາດ Request Body ເປັນ 50MB (ປ້ອງກັນ Error 413)
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   app.enableCors({
     origin: true,
