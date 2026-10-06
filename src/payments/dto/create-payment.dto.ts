@@ -10,6 +10,10 @@ export class CreatePaymentDto {
     @IsOptional()
     packageId?: number; // ID ແພັກເກັດ ຖ້າມີການຊື້ ຫຼື ຕໍ່ອາຍຸ
 
+    @IsInt()
+    @IsOptional()
+    productId?: number
+
     @IsString()
     @IsNotEmpty()
     description: string; // รายละเอียด เช่น "ต่ออายุบุฟเฟต์ 1 เดือน"

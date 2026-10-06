@@ -7,7 +7,7 @@ import { Currency, PaymentMethod } from '@prisma/client';
 export class PaymentsService {
   constructor(private prisma: PrismaService) { }
 
-  // 1. ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກອັດໂນມັດ
+  // 1. ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກ / ຕັດສະຕັອກສິນຄ້າອັດໂນມັດ
   async create(staffId: number, dto: CreatePaymentDto) {
     if (!staffId) {
       throw new BadRequestException('ບໍ່ພົບຂໍ້ມູນພະນັກງານ (staffId)');
@@ -15,6 +15,7 @@ export class PaymentsService {
     return this.prisma.$transaction(async (tx) => {
       let member = null;
       let pkg = null;
+      let product = null; // 👈 ເພີ່ມ variable ສຳລັບ product
 
       // ກວດສອບສະມາຊິກ (ຖ້າມີການສົ່ງ memberId ມາ)
       if (dto.memberId) {
@@ -36,11 +37,27 @@ export class PaymentsService {
         }
       }
 
+      // 👈 ເພີ່ມ: ກວດສອບ Product ແລະ ເຊັກສະຕັອກ (ຖ້າມີການສົ່ງ productId ມາ)
+      if (dto.productId) {
+        product = await tx.product.findUnique({
+          where: { id: dto.productId },
+        });
+
+        if (!product) {
+          throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນສິນຄ້ານີ້');
+        }
+
+        if (product.stock < 1) {
+          throw new BadRequestException(`ສິນຄ້າ "${product.name}" ໝົດສະຕັອກແລ້ວ`);
+        }
+      }
+
       // 1. ສ້າງ Record ການຊຳລະເງິນ
       const payment = await tx.payment.create({
         data: {
           staffId,
           memberId: dto.memberId || null,
+          productId: dto.productId || null, // 👈 ເພີ່ມ productId
           description: dto.description,
           amountLak: dto.amountLak,
           paidCurrency: dto.paidCurrency || Currency.LAK,
@@ -52,10 +69,23 @@ export class PaymentsService {
         include: {
           staff: { select: { id: true, name: true } },
           member: { select: { id: true, fullName: true, code: true } },
+          product: { select: { id: true, name: true, priceLak: true, barcode: true } }, // 👈 Include product ມາພ້ອມ
         },
       });
 
-      // 2. ຖ້າມີການຊື້ Package ໃຫ້ອັບເດດຂໍ້ມູນສະມາຊິກ
+      // 2. ຖ້າມີການຊື້ Product -> ຕັດສະຕັອກສິນຄ້າ -1
+      if (product) {
+        await tx.product.update({
+          where: { id: product.id },
+          data: {
+            stock: {
+              decrement: 1, // 👈 ຕັດສະຕັອກອອກ 1
+            },
+          },
+        });
+      }
+
+      // 3. ຖ້າມີການຊື້ Package ໃຫ້ອັບເດດຂໍ້ມູນສະມາຊິກ
       if (member && pkg) {
         const updateMemberData: any = {
           packageId: pkg.id,
@@ -63,9 +93,7 @@ export class PaymentsService {
 
         const now = new Date();
 
-        // ຖ້າເປັນແພັກເກັດກຳນົດວັນ (durationDays) -> ຄິດໄລ່ອາຍຸໃໝ່
         if (pkg.durationDays) {
-          // ຖ້າອາຍຸເກົ່າຍັງບໍ່ໝົດ ໃຫ້ຕໍ່ຈາກອາຍຸເກົ່າ. ຖ້າໝົດແລ້ວ ໃຫ້ເລີ່ມນັບຈາກມື້ນີ້
           const baseDate = member.expireDate && member.expireDate > now ? member.expireDate : now;
           const newExpireDate = new Date(baseDate);
           newExpireDate.setDate(newExpireDate.getDate() + pkg.durationDays);
@@ -73,7 +101,6 @@ export class PaymentsService {
           updateMemberData.expireDate = newExpireDate;
         }
 
-        // ຖ້າເປັນແພັກເກັດ (sessions ຫຼື durationDays) -> ບວກຈຳນວນຄັ້ງເພີ່ມ (รายวัน = 1, รายเดือน = 30, รายปี = 365, หรือตาม sessions)
         const sessionsToAdd = pkg.sessions ?? pkg.durationDays ?? 0;
         if (sessionsToAdd > 0) {
           const currentSessions = member.remainingSessions && member.remainingSessions > 0 ? member.remainingSessions : 0;
@@ -96,6 +123,7 @@ export class PaymentsService {
       include: {
         staff: { select: { id: true, name: true } },
         member: { select: { id: true, fullName: true, code: true } },
+        product: { select: { id: true, name: true, priceLak: true, barcode: true } }, // 👈 Include product
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -108,6 +136,7 @@ export class PaymentsService {
       include: {
         staff: { select: { id: true, name: true } },
         member: { select: { id: true, fullName: true, code: true } },
+        product: { select: { id: true, name: true, priceLak: true, barcode: true } }, // 👈 Include product
       },
     });
 

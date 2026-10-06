@@ -11,6 +11,7 @@ import { MembersModule } from './members/members.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
+import { ProductsModule } from './products/products.module';
 
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -33,6 +34,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PaymentsModule,
     ExpensesModule,
     ReportsModule,
+    ProductsModule,
 
   ],
   controllers: [AppController],
