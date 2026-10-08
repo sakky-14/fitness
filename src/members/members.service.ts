@@ -3,43 +3,62 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateMemberDto } from './dto/create-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 import { CheckInDto } from './dto/check-in.dto';
-import { createClient } from '@supabase/supabase-js'; // 👈 ເພີ່ມ Import Supabase Client
+import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class MembersService {
   private supabase;
+  private bucketName = process.env.SUPABASE_BUCKET || 'images';
 
   constructor(private prisma: PrismaService) {
-    // ດຶງຄ່າ Supabase URL & Key ຈາກ .env
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
-    const bucketName = process.env.SUPABASE_BUCKET || 'images/members';
 
     if (supabaseUrl && supabaseKey) {
       this.supabase = createClient(supabaseUrl, supabaseKey);
     }
   }
 
-  // 💡 Helper function: ສຳລັບລົບຮູບພາບออกจาก Supabase Storage Bucket 'members'
+  // 💡 Helper function: ສຳລັບລົບຮູບພາບออกจาก Supabase Storage Bucket 'images' (ໂຟນເດີ members)
   private async deletePhotoFromStorage(photoUrl: string | null) {
-    if (!photoUrl || !this.supabase) return;
+    if (!photoUrl) return;
 
-    try {
-      // ແຍກເອົາຊື່ຟາຍອອກຈາກ URL (ຕົວຢ່າງ: https://xxx.supabase.co/storage/v1/object/public/members/photo.jpg -> photo.jpg)
-      const urlParts = photoUrl.split('images/members/');
-      const fileName = urlParts.length > 1 ? urlParts[1] : photoUrl.split('/').pop();
+    // 1. ລົບຮູບໃນ Supabase Storage
+    if (this.supabase && photoUrl.includes('/storage/v1/object/public/')) {
+      try {
+        // ແຍກເອົາ path ຫຼັງຈາກ bucket name (ຕົວຢ່າງ: https://.../images/members/filename.jpg -> members/filename.jpg)
+        const urlParts = photoUrl.split(`/${this.bucketName}/`);
+        if (urlParts.length > 1) {
+          const filePathInBucket = urlParts[1]; // ຈະໄດ້ 'members/uuid.jpg'
 
-      if (fileName) {
-        const { error } = await this.supabase.storage
-          .from('images/members')
-          .remove([fileName]);
+          const { error } = await this.supabase.storage
+            .from(this.bucketName)
+            .remove([filePathInBucket]);
 
-        if (error) {
-          console.error(' Error deleting image from Supabase Storage:', error.message);
+          if (error) {
+            console.error('❌ Error deleting image from Supabase Storage:', error.message);
+          } else {
+            console.log(`✅ Successfully deleted image from Supabase Storage: ${filePathInBucket}`);
+          }
         }
+      } catch (err) {
+        console.error('❌ Failed to delete image from Supabase storage:', err);
       }
-    } catch (err) {
-      console.error(' Failed to delete image from storage:', err);
+    }
+
+    // 2. ລົບຮູບໃນ Local Disk (ຖ້າມີ)
+    if (photoUrl.startsWith('/uploads/members/')) {
+      try {
+        const localFileName = photoUrl.split('/uploads/members/')[1];
+        const localPath = join('./uploads/members', localFileName);
+        if (fs.existsSync(localPath)) {
+          fs.unlinkSync(localPath);
+        }
+      } catch (err) {
+        console.error('❌ Failed to delete local image:', err);
+      }
     }
   }
 
@@ -176,7 +195,6 @@ export class MembersService {
   async remove(id: number) {
     const member = await this.findOne(id);
 
-    // 🛑 ລົບຮູບຂອງສະມາຊິກออกจาก Supabase Storage ຖ້າມີຮູບ
     if (member.photoUrl) {
       await this.deletePhotoFromStorage(member.photoUrl);
     }
@@ -218,20 +236,20 @@ export class MembersService {
       throw new BadRequestException('ແພັກເກັດສະມາຊິກຂອງທ່ານ ໝົດອາຍຸແລ້ວ!');
     }
 
-    // 🔄 [PREPARE SESSIONS]: ຈັດການຄ່າ remainingSessions ໃຫ້ກົງກັບ Package ຖ້າມັນເປັນค่าว่าง
+    // 🔄 [PREPARE SESSIONS]: ຈັດການຄ່າ remainingSessions ໃຫ້ກົງກັບ Package ຖ້າມັນເປັນຄ່າວ່າງ
     let currentSessions = member.remainingSessions;
     if (currentSessions === null || currentSessions === undefined) {
       currentSessions = member.package?.sessions ?? null;
     }
 
-    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ (ຖ້າເປັນແພັກເກັດນັບຄັ້ງ)
+    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ
     if (currentSessions !== null && currentSessions !== undefined) {
       if (currentSessions <= 0) {
         throw new BadRequestException('ຈຳນວນຄັ້ງໃນການເຂົ້າໃຊ້ງານຂອງທ່ານ ໝົດແລ້ວ!');
       }
     }
 
-    // 🔄 [ACTION]: ອັບເດດຂໍ້ມູນການ Check-in ແລະ ຫັກຈຳນວນຄັ້ງລົງ 1
+    // 🔄 [ACTION]: ອັບເດດຂໍ້ມູນການ Check-in
     const updateData: any = {
       lastCheckIn: now,
     };
@@ -246,7 +264,6 @@ export class MembersService {
       include: { package: true },
     });
 
-    // คำนวณจำนวนวันที่เหลือ (remainingDays) จาก expireDate
     let remainingDays: number | null = null;
     if (updatedMember.expireDate) {
       const diffInMs = updatedMember.expireDate.getTime() - now.getTime();

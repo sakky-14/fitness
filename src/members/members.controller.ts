@@ -36,7 +36,10 @@ const multerOptions = {
 // ☁️ Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL || 'https://kxepuykhvqvjnooeoqcl.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY;
-const bucketName = process.env.SUPABASE_BUCKET || 'images/members';
+
+// 🎯 Bucket ຊື່ 'images' ແລະ Folder ຊື່ 'members'
+const BUCKET_NAME = process.env.SUPABASE_BUCKET || 'images';
+const FOLDER_NAME = 'members';
 
 const supabase = (supabaseKey && supabaseKey !== 'YOUR_SUPABASE_KEY')
   ? createClient(supabaseUrl, supabaseKey)
@@ -58,19 +61,23 @@ async function uploadFileToSupabase(
       ? fs.readFileSync(filePathOrBuffer)
       : filePathOrBuffer;
 
+    // 🎯 ກຳນົດ Path ໃຫ້ເຂົ້າໄປ Folder 'members' ໃນ Bucket 'images' (ຕົວຢ່າງ: members/uuid.jpg)
+    const filePathInBucket = `${FOLDER_NAME}/${filename}`;
+
     let { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(filename, fileData, {
+      .from(BUCKET_NAME)
+      .upload(filePathInBucket, fileData, {
         contentType,
         upsert: true,
       });
 
+    // ຖ້າບໍ່ມີ Bucket ເທື່ອ ໃຫ້ສ້າງ Bucket 'images'
     if (error && (error.message.includes('not found') || error.message.includes('Bucket'))) {
-      console.log(`Bucket '${bucketName}' not found. Creating bucket...`);
-      await supabase.storage.createBucket(bucketName, { public: true });
+      console.log(`Bucket '${BUCKET_NAME}' not found. Creating bucket...`);
+      await supabase.storage.createBucket(BUCKET_NAME, { public: true });
       const retry = await supabase.storage
-        .from(bucketName)
-        .upload(filename, fileData, {
+        .from(BUCKET_NAME)
+        .upload(filePathInBucket, fileData, {
           contentType,
           upsert: true,
         });
@@ -83,9 +90,10 @@ async function uploadFileToSupabase(
       return null;
     }
 
+    // ດຶງ Public URL ຂອງຟາຍ
     const { data: publicUrlData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filename);
+      .from(BUCKET_NAME)
+      .getPublicUrl(filePathInBucket);
 
     console.log('✅ Successfully uploaded to Supabase Storage:', publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
@@ -113,14 +121,14 @@ async function saveBase64Image(base64String: string): Promise<string> {
   const uuid = crypto.randomUUID();
   const filename = `${uuid}.${ext}`;
 
-  // 1. บันทึกลง Disk ท้องถิ่น
+  // 1. ບັນທຶກລົງ Disk ທ້ອງຖິ່ນ (Backup/Temporary)
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   const localPath = join(uploadDir, filename);
   fs.writeFileSync(localPath, dataBuffer);
 
-  // 2. อัปโหลดไปยัง Supabase Storage
+  // 2. ອັບໂຫລດໄປຍັງ Supabase Storage
   const supabasePublicUrl = await uploadFileToSupabase(dataBuffer, filename, contentType);
 
   return supabasePublicUrl || `/uploads/members/${filename}`;
