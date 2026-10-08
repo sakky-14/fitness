@@ -28,7 +28,6 @@ export class MembersService {
     // 1. ລົບຮູບໃນ Supabase Storage
     if (this.supabase && photoUrl.includes('/storage/v1/object/public/')) {
       try {
-        // ແຍກເອົາ path ຫຼັງຈາກ bucket name (ຕົວຢ່າງ: https://.../images/members/filename.jpg -> members/filename.jpg)
         const urlParts = photoUrl.split(`/${this.bucketName}/`);
         if (urlParts.length > 1) {
           const filePathInBucket = urlParts[1]; // ຈະໄດ້ 'members/uuid.jpg'
@@ -145,7 +144,6 @@ export class MembersService {
   async update(id: number, dto: UpdateMemberDto) {
     const member = await this.findOne(id);
 
-    // 🛑 ຖ້າມີການອັບເດດ photoUrl ໃໝ່ ຫຼື ສົ່ງເປັນ null (ລົບຮູບ) -> ລົບຮູບເກົ່າໃນ Supabase Storage
     if (dto.photoUrl !== undefined && dto.photoUrl !== member.photoUrl) {
       if (member.photoUrl) {
         await this.deletePhotoFromStorage(member.photoUrl);
@@ -217,7 +215,6 @@ export class MembersService {
 
     const now = new Date();
 
-    // 🛑 [CHECK 1]: Anti-Passback Cooldown (1 ນາທີ)
     if (member.lastCheckIn) {
       const diffInMs = now.getTime() - member.lastCheckIn.getTime();
       const diffInMinutes = diffInMs / (1000 * 60);
@@ -231,25 +228,21 @@ export class MembersService {
       }
     }
 
-    // 🛑 [CHECK 2]: ກວດສອບອາຍຸແພັກເກັດ
     if (member.expireDate && member.expireDate < now) {
       throw new BadRequestException('ແພັກເກັດສະມາຊິກຂອງທ່ານ ໝົດອາຍຸແລ້ວ!');
     }
 
-    // 🔄 [PREPARE SESSIONS]: ຈັດການຄ່າ remainingSessions ໃຫ້ກົງກັບ Package ຖ້າມັນເປັນຄ່າວ່າງ
     let currentSessions = member.remainingSessions;
     if (currentSessions === null || currentSessions === undefined) {
       currentSessions = member.package?.sessions ?? null;
     }
 
-    // 🛑 [CHECK 3]: ກວດສອບ ຈຳນວນຄັ້ງທີ່ເຫຼືອ
     if (currentSessions !== null && currentSessions !== undefined) {
       if (currentSessions <= 0) {
         throw new BadRequestException('ຈຳນວນຄັ້ງໃນການເຂົ້າໃຊ້ງານຂອງທ່ານ ໝົດແລ້ວ!');
       }
     }
 
-    // 🔄 [ACTION]: ອັບເດດຂໍ້ມູນການ Check-in
     const updateData: any = {
       lastCheckIn: now,
     };
