@@ -40,7 +40,17 @@ export class ExpensesService {
     });
   }
 
-  // 3. ດຶງລາຍຈ່າຍຕາມ ID
+  // 3. ຄິດໄລ່ຍອດລາຍຈ່າຍລວມ (👈 ເພີ່ມໃໝ່)
+  async getTotalExpense() {
+    const result = await this.prisma.expense.aggregate({
+      _sum: {
+        amountLak: true,
+      },
+    });
+    return { totalExpense: result._sum.amountLak || 0 };
+  }
+
+  // 4. ດຶງລາຍຈ່າຍຕາມ ID
   async findOne(id: number) {
     const expense = await this.prisma.expense.findUnique({
       where: { id },
@@ -56,7 +66,7 @@ export class ExpensesService {
     return expense;
   }
 
-  // 4. ແກ້ໄຂລາຍຈ່າຍ
+  // 5. ແກ້ໄຂລາຍຈ່າຍ
   async update(id: number, dto: UpdateExpenseDto) {
     await this.findOne(id);
     return this.prisma.expense.update({
@@ -68,7 +78,7 @@ export class ExpensesService {
     });
   }
 
-  // 5. ລົບລາຍຈ່າຍ (ສະເພາະ ADMIN)
+  // 6. ລົບລາຍຈ່າຍ (ສະເພາະ ADMIN)
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.expense.delete({

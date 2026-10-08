@@ -23,6 +23,12 @@ export class ExpensesController {
     return this.expensesService.findAll();
   }
 
+  // 👈 ເພີ່ມ Endpoint ດຶງຍອດລາຍຈ່າຍລວມ (ຕ້ອງໄວ້ກ່ອນ @Get(':id') เสมໍ)
+  @Get('expense/total')
+  async getTotalExpense() {
+    return this.expensesService.getTotalExpense();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.expensesService.findOne(id);
