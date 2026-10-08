@@ -20,6 +20,12 @@ export class PaymentsController {
     return this.paymentsService.findAll();
   }
 
+  // 👈 ເພີ່ມ Endpoint ສຳລັບດຶງຍອດລາຍຮັບລວມ
+  @Get('revenue/total')
+  getTotalRevenue() {
+    return this.paymentsService.getTotalRevenue();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.paymentsService.findOne(id);

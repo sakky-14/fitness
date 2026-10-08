@@ -15,7 +15,7 @@ export class PaymentsService {
     return this.prisma.$transaction(async (tx) => {
       let member = null;
       let pkg = null;
-      let product = null; // 👈 ເພີ່ມ variable ສຳລັບ product
+      let product = null;
 
       // ກວດສອບສະມາຊິກ (ຖ້າມີການສົ່ງ memberId ມາ)
       if (dto.memberId) {
@@ -37,7 +37,7 @@ export class PaymentsService {
         }
       }
 
-      // 👈 ເພີ່ມ: ກວດສອບ Product ແລະ ເຊັກສະຕັອກ (ຖ້າມີການສົ່ງ productId ມາ)
+      // ກວດສອບ Product ແລະ ເຊັກສະຕັອກ (ຖ້າມີການສົ່ງ productId ມາ)
       if (dto.productId) {
         product = await tx.product.findUnique({
           where: { id: dto.productId },
@@ -57,7 +57,7 @@ export class PaymentsService {
         data: {
           staffId,
           memberId: dto.memberId || null,
-          productId: dto.productId || null, // 👈 ເພີ່ມ productId
+          productId: dto.productId || null,
           description: dto.description,
           amountLak: dto.amountLak,
           paidCurrency: dto.paidCurrency || Currency.LAK,
@@ -69,7 +69,7 @@ export class PaymentsService {
         include: {
           staff: { select: { id: true, name: true } },
           member: { select: { id: true, fullName: true, code: true } },
-          product: { select: { id: true, name: true, priceLak: true, barcode: true } }, // 👈 Include product ມາພ້ອມ
+          product: { select: { id: true, name: true, priceLak: true, barcode: true } },
         },
       });
 
@@ -79,7 +79,7 @@ export class PaymentsService {
           where: { id: product.id },
           data: {
             stock: {
-              decrement: 1, // 👈 ຕັດສະຕັອກອອກ 1
+              decrement: 1,
             },
           },
         });
@@ -123,7 +123,7 @@ export class PaymentsService {
       include: {
         staff: { select: { id: true, name: true } },
         member: { select: { id: true, fullName: true, code: true } },
-        product: { select: { id: true, name: true, priceLak: true, barcode: true } }, // 👈 Include product
+        product: { select: { id: true, name: true, priceLak: true, barcode: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -136,7 +136,7 @@ export class PaymentsService {
       include: {
         staff: { select: { id: true, name: true } },
         member: { select: { id: true, fullName: true, code: true } },
-        product: { select: { id: true, name: true, priceLak: true, barcode: true } }, // 👈 Include product
+        product: { select: { id: true, name: true, priceLak: true, barcode: true } },
       },
     });
 
@@ -145,5 +145,18 @@ export class PaymentsService {
     }
 
     return payment;
+  }
+
+  // 4. 👈 ເພີ່ມ: ດຶງຍອດລາຍຮັບລວມທັງໝົດ
+  async getTotalRevenue() {
+    const result = await this.prisma.payment.aggregate({
+      _sum: {
+        amountLak: true,
+      },
+    });
+
+    return {
+      totalRevenue: result._sum.amountLak || 0,
+    };
   }
 }
