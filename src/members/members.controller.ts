@@ -36,7 +36,7 @@ const multerOptions = {
 // ☁️ Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL || 'https://kxepuykhvqvjnooeoqcl.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY;
-const bucketName = process.env.SUPABASE_BUCKET || 'members';
+const bucketName = process.env.SUPABASE_BUCKET || 'images/members';
 
 const supabase = (supabaseKey && supabaseKey !== 'YOUR_SUPABASE_KEY')
   ? createClient(supabaseUrl, supabaseKey)

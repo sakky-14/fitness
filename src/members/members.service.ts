@@ -13,6 +13,7 @@ export class MembersService {
     // ດຶງຄ່າ Supabase URL & Key ຈາກ .env
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
+    const bucketName = process.env.SUPABASE_BUCKET || 'images/members';
 
     if (supabaseUrl && supabaseKey) {
       this.supabase = createClient(supabaseUrl, supabaseKey);
@@ -25,12 +26,12 @@ export class MembersService {
 
     try {
       // ແຍກເອົາຊື່ຟາຍອອກຈາກ URL (ຕົວຢ່າງ: https://xxx.supabase.co/storage/v1/object/public/members/photo.jpg -> photo.jpg)
-      const urlParts = photoUrl.split('/members/');
+      const urlParts = photoUrl.split('images/members/');
       const fileName = urlParts.length > 1 ? urlParts[1] : photoUrl.split('/').pop();
 
       if (fileName) {
         const { error } = await this.supabase.storage
-          .from('members')
+          .from('images/members')
           .remove([fileName]);
 
         if (error) {
