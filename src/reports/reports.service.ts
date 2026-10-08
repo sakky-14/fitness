@@ -39,6 +39,14 @@ export class ReportsService {
       where: whereDateRange,
     });
 
+    // 👈 ແຍກລາຍຮັບຕາມ Category (ເພີ່ມເຂົ້າມາໃຫ້ກົງກັບ Frontend)
+    const incomeByCategory = await this.prisma.payment.groupBy({
+      by: ['paymentMethod'],
+      _sum: { amountLak: true },
+      _count: { id: true },
+      where: whereDateRange,
+    });
+
     // ແຍກລາຍຈ່າຍຕາມ Category
     const expenseByCategory = await this.prisma.expense.groupBy({
       by: ['category'],
@@ -67,6 +75,7 @@ export class ReportsService {
         },
       },
       incomeByMethod,
+      incomeByCategory, // 👈 ส่ง property ນີ້ໃຫ້ Frontend ໃຊ້ສະແດງຜົນ
       expenseByCategory,
     };
   }
