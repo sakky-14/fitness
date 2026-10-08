@@ -3,7 +3,7 @@ import {
   UseInterceptors, UploadedFile
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { extname, join } from 'path';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -18,24 +18,12 @@ import { Role } from '@prisma/client';
 
 const uploadDir = './uploads/products';
 
-// ⚙️ Multer Options - ຕັ້ງຊື່ຟາຍເປັນ UUID
+// ⚙️ Multer Options - ໃຊ້ memoryStorage() ເພື່ອຮັບໄຟລ໌ເປັນ Buffer ແລ້ວຕັ້ງຊື່ຟາຍເປັນ UUID
 const multerOptions = {
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
-  storage: diskStorage({
-    destination: (req, file, callback) => {
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      callback(null, uploadDir);
-    },
-    filename: (req, file, callback) => {
-      const uuid = crypto.randomUUID();
-      const ext = extname(file.originalname);
-      callback(null, `${uuid}${ext}`);
-    },
-  }),
+  storage: memoryStorage(),
 };
 
 // ☁️ Initialize Supabase Client
@@ -50,9 +38,9 @@ const supabase = (supabaseKey && supabaseKey !== 'YOUR_SUPABASE_KEY')
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
-// ☁️ Helper: Upload image buffer or file path to Supabase Storage
+// ☁️ Helper: Upload Buffer ໄປຫາ Supabase Storage
 async function uploadFileToSupabase(
-  filePathOrBuffer: string | Buffer,
+  buffer: Buffer,
   filename: string,
   contentType: string,
 ): Promise<string | null> {
@@ -62,16 +50,12 @@ async function uploadFileToSupabase(
   }
 
   try {
-    const fileData = typeof filePathOrBuffer === 'string'
-      ? fs.readFileSync(filePathOrBuffer)
-      : filePathOrBuffer;
-
-    // 🎯 Path ຈະເປັນ products/uuid.jpg
+    // 🎯 Path ໃນ Bucket ຈະເປັນ products/<uuid>.<ext>
     const filePathInBucket = `${FOLDER_NAME}/${filename}`;
 
     let { data, error } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(filePathInBucket, fileData, {
+      .upload(filePathInBucket, buffer, {
         contentType,
         upsert: true,
       });
@@ -81,7 +65,7 @@ async function uploadFileToSupabase(
       await supabase.storage.createBucket(BUCKET_NAME, { public: true });
       const retry = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filePathInBucket, fileData, {
+        .upload(filePathInBucket, buffer, {
           contentType,
           upsert: true,
         });
@@ -98,7 +82,7 @@ async function uploadFileToSupabase(
       .from(BUCKET_NAME)
       .getPublicUrl(filePathInBucket);
 
-    console.log('✅ Successfully uploaded product image to Supabase Storage:', publicUrlData.publicUrl);
+    console.log('✅ Uploaded to Supabase with UUID filename:', publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
   } catch (err) {
     console.error('Supabase upload exception:', err);
@@ -106,7 +90,29 @@ async function uploadFileToSupabase(
   }
 }
 
-// 👈 ຟັງຊັນຊ່ວຍແປງ Base64 Data URL ໃຫ້ເປັນຟາຍ UUID ແລະ ອັບໂຫລດໄປ Supabase Storage
+// 👈 ຟັງຊັນປະມວນຜົນ Uploaded File ໃຫ້ເປັນ UUID Filename 100%
+async function processUploadedFile(file: Express.Multer.File): Promise<string> {
+  const ext = extname(file.originalname) || '.jpg';
+  const uuidFilename = `${crypto.randomUUID()}${ext}`; // 👈 ສ້າງ UUID Filename ທີ່ນີ້
+  const contentType = file.mimetype || 'image/jpeg';
+
+  // 1. ອັບໂຫລດໄປ Supabase Storage
+  const supabasePublicUrl = await uploadFileToSupabase(file.buffer, uuidFilename, contentType);
+  if (supabasePublicUrl) {
+    return supabasePublicUrl;
+  }
+
+  // 2. ຖ້າ Supabase Upload ບໍ່ໄດ້ ໃຫ້ Save ລົງ Local Disk ດ້ວຍ UUID
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  const localPath = join(uploadDir, uuidFilename);
+  fs.writeFileSync(localPath, file.buffer);
+
+  return `/uploads/products/${uuidFilename}`;
+}
+
+// 👈 ຟັງຊັນແປງ Base64 Data URL ເປັນ UUID Filename
 async function saveBase64Image(base64String: string): Promise<string> {
   if (!base64String || !base64String.startsWith('data:image/')) {
     return base64String;
@@ -116,35 +122,26 @@ async function saveBase64Image(base64String: string): Promise<string> {
   if (!matches) return base64String;
 
   const rawType = matches[1].toLowerCase();
-  let ext = rawType === 'jpeg' ? 'jpg' : rawType.includes('+') ? rawType.split('+')[0] : rawType;
+  const ext = rawType === 'jpeg' ? 'jpg' : rawType.includes('+') ? rawType.split('+')[0] : rawType;
   const contentType = `image/${rawType}`;
 
   const base64Data = matches[2].replace(/\s/g, '');
   const dataBuffer = Buffer.from(base64Data, 'base64');
-  const uuid = crypto.randomUUID();
-  const filename = `${uuid}.${ext}`;
+
+  const uuidFilename = `${crypto.randomUUID()}.${ext}`; // 👈 ສ້າງ UUID Filename
+
+  const supabasePublicUrl = await uploadFileToSupabase(dataBuffer, uuidFilename, contentType);
+  if (supabasePublicUrl) {
+    return supabasePublicUrl;
+  }
 
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
-  const localPath = join(uploadDir, filename);
+  const localPath = join(uploadDir, uuidFilename);
   fs.writeFileSync(localPath, dataBuffer);
 
-  const supabasePublicUrl = await uploadFileToSupabase(dataBuffer, filename, contentType);
-
-  return supabasePublicUrl || `/uploads/products/${filename}`;
-}
-
-// 👈 ຟັງຊັນຊ່ວຍອັບໂຫລດ Multipart File ໄປ Supabase Storage
-async function processUploadedFile(file: Express.Multer.File): Promise<string> {
-  const localUrl = `/uploads/products/${file.filename}`;
-  if (!file) return localUrl;
-
-  const contentType = file.mimetype || 'image/jpeg';
-  const filePath = file.path || join(uploadDir, file.filename);
-
-  const supabasePublicUrl = await uploadFileToSupabase(filePath, file.filename, contentType);
-  return supabasePublicUrl || localUrl;
+  return `/uploads/products/${uuidFilename}`;
 }
 
 @Controller('products')
@@ -161,7 +158,7 @@ export class ProductsController {
   ) {
     if (file) {
       createProductDto.imageUrl = await processUploadedFile(file);
-    } else if (createProductDto.imageUrl) {
+    } else if (createProductDto.imageUrl && createProductDto.imageUrl.startsWith('data:image/')) {
       createProductDto.imageUrl = await saveBase64Image(createProductDto.imageUrl);
     }
     return this.productsService.create(createProductDto);
@@ -197,7 +194,7 @@ export class ProductsController {
   ) {
     if (file) {
       updateProductDto.imageUrl = await processUploadedFile(file);
-    } else if (updateProductDto.imageUrl) {
+    } else if (updateProductDto.imageUrl && updateProductDto.imageUrl.startsWith('data:image/')) {
       updateProductDto.imageUrl = await saveBase64Image(updateProductDto.imageUrl);
     }
     return this.productsService.update(id, updateProductDto);

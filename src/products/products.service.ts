@@ -12,10 +12,10 @@ export class ProductsService {
   private bucketName = process.env.SUPABASE_BUCKET || 'images';
 
   constructor(private prisma: PrismaService) {
-    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://kxepuykhvqvjnooeoqcl.supabase.co';
     const supabaseKey = process.env.SUPABASE_KEY;
 
-    if (supabaseUrl && supabaseKey) {
+    if (supabaseKey && supabaseKey !== 'YOUR_SUPABASE_KEY') {
       this.supabase = createClient(supabaseUrl, supabaseKey);
     }
   }
@@ -29,11 +29,11 @@ export class ProductsService {
       try {
         const urlParts = imageUrl.split(`/${this.bucketName}/`);
         if (urlParts.length > 1) {
-          const filePathInBucket = urlParts[1]; // ຈະໄດ້ 'products/uuid.jpg'
+          const filePathInBucket = urlParts[1]; // e.g. "products/550e8400-e29b-41d4-a716-446655440000.jpg"
 
-          const { error } = await this.supabase
-            ? await this.supabase.storage.from(this.bucketName).remove([filePathInBucket])
-            : { error: null };
+          const { error } = await this.supabase.storage
+            .from(this.bucketName)
+            .remove([filePathInBucket]);
 
           if (error) {
             console.error('❌ Error deleting product image from Supabase Storage:', error.message);
@@ -53,6 +53,7 @@ export class ProductsService {
         const localPath = join('./uploads/products', localFileName);
         if (fs.existsSync(localPath)) {
           fs.unlinkSync(localPath);
+          console.log(`✅ Deleted local product image: ${localPath}`);
         }
       } catch (err) {
         console.error('❌ Failed to delete local product image:', err);
@@ -127,7 +128,7 @@ export class ProductsService {
       }
     }
 
-    // 🛑 ຖ້າມີການອັບເດດ imageUrl ໃໝ່ ຫຼື ສົ່ງເປັນ null (ລົບຮູບ) -> ລົບຮູບເກົ່າໃນ Supabase Storage
+    // 🛑 ຖ້າມີການອັບເດດ imageUrl ໃໝ່ ຫຼື ສົ່ງ null/empty ເພື່ອລົບຮູບ -> ລົບຮູບເກົ່າໃນ Supabase Storage
     if (dto.imageUrl !== undefined && dto.imageUrl !== product.imageUrl) {
       if (product.imageUrl) {
         await this.deletePhotoFromStorage(product.imageUrl);
