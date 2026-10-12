@@ -21,7 +21,7 @@ export class MembersService {
     }
   }
 
-  // 💡 Helper function: ສຳລັບລົບຮູບພາບออกจาก Supabase Storage Bucket 'images' (ໂຟນເດີ members)
+  // 💡 Helper function: ສຳລັບລົບຮູບພາບອອກຈາກ Supabase Storage Bucket 'images' (ໂຟນເດີ members)
   private async deletePhotoFromStorage(photoUrl: string | null) {
     if (!photoUrl) return;
 
@@ -78,10 +78,7 @@ export class MembersService {
     }
 
     const packageId = dto.packageId ? Number(dto.packageId) : null;
-    let calculatedRemainingSessions: number | null | undefined =
-      dto.remainingSessions !== undefined && dto.remainingSessions !== null && (dto.remainingSessions as any) !== ''
-        ? Number(dto.remainingSessions)
-        : undefined;
+    let calculatedRemainingSessions: number | null | undefined = null;
     let calculatedExpireDate = dto.expireDate ? new Date(dto.expireDate) : null;
 
     if (packageId) {
@@ -92,9 +89,8 @@ export class MembersService {
         throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
       }
 
-      if (calculatedRemainingSessions === undefined || calculatedRemainingSessions === null || isNaN(calculatedRemainingSessions)) {
-        calculatedRemainingSessions = pkg.sessions ?? null;
-      }
+      // 👉 ດຶງຄ່າ sessions ຈາກ package ມາໃຊ້ໂດຍກົງ
+      calculatedRemainingSessions = pkg.sessions ?? null;
 
       if (!calculatedExpireDate && pkg.durationDays) {
         const now = new Date();
@@ -103,7 +99,12 @@ export class MembersService {
         calculatedExpireDate = expire;
       }
     } else {
-      calculatedRemainingSessions = calculatedRemainingSessions ?? null;
+      calculatedRemainingSessions =
+        dto.remainingSessions !== undefined &&
+          dto.remainingSessions !== null &&
+          (dto.remainingSessions as any) !== ''
+          ? Number(dto.remainingSessions)
+          : null;
     }
 
     return this.prisma.member.create({
@@ -163,18 +164,20 @@ export class MembersService {
         throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
       }
 
-      if (dto.remainingSessions === undefined) {
-        dataToUpdate.remainingSessions = pkg.sessions ?? null;
-      }
+      // 👉 ຖ້າປ່ຽນ Package ໃຫ້ດຶງ sessions ຂອງ package ໃໝ່ມາໃສ່ອັດຕະໂນມັດ
+      dataToUpdate.remainingSessions = pkg.sessions ?? null;
+
       if (!dto.expireDate && pkg.durationDays) {
         const now = new Date();
         const expire = new Date(now);
         expire.setDate(expire.getDate() + pkg.durationDays);
         dataToUpdate.expireDate = expire;
       }
-    }
-
-    if (dto.remainingSessions !== undefined && dto.remainingSessions !== null && (dto.remainingSessions as any) !== '') {
+    } else if (
+      dto.remainingSessions !== undefined &&
+      dto.remainingSessions !== null &&
+      (dto.remainingSessions as any) !== ''
+    ) {
       dataToUpdate.remainingSessions = Number(dto.remainingSessions);
     }
 
