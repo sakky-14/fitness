@@ -185,7 +185,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.STAFF) // 👈 ອະນຸຍາດໃຫ້ທັງ ADMIN ແລະ STAFF ສามารถອັບເດດ/ຕັດ Stock ສິນຄ້າໄດ້
   @UseInterceptors(FileInterceptor('image', multerOptions))
   async update(
     @Param('id', ParseIntPipe) id: number,
