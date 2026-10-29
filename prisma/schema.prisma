@@ -82,7 +82,7 @@ model User {
   passwordHash String
   role         Role      @default(CASHIER)
   createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  updatedAt    DateTime  @default(now()) @updatedAt
 
   payments       Payment[]
   expenses       Expense[]
@@ -124,7 +124,7 @@ model Shift {
   status           ShiftStatus @default(OPEN)
   notes            String?
   createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  updatedAt        DateTime    @default(now()) @updatedAt
 
   openedBy User      @relation("ShiftOpenedBy", fields: [openedById], references: [id])
   closedBy User?     @relation("ShiftClosedBy", fields: [closedById], references: [id])
@@ -143,7 +143,7 @@ model Package {
   ptHours       Decimal?    @db.Decimal(5, 2)
   isActive      Boolean     @default(true)
   createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  updatedAt     DateTime    @default(now()) @updatedAt
 
   members        Member[]
   memberPackages MemberPackage[]
@@ -163,7 +163,7 @@ model Member {
   lastCheckIn       DateTime?
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now()) @updatedAt
 
   package        Package?        @relation(fields: [packageId], references: [id])
   payments       Payment[]
@@ -185,7 +185,7 @@ model MemberPackage {
   remainingPtHours  Decimal?  @default(0) @db.Decimal(5, 2)
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now()) @updatedAt
 
   member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
   package    Package     @relation(fields: [packageId], references: [id])
@@ -202,7 +202,7 @@ model Trainer {
   commissionRate Decimal  @default(0) @db.Decimal(5, 2)
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime @default(now()) @updatedAt
 
   user       User?       @relation(fields: [userId], references: [id])
   ptSessions PTSession[]
@@ -238,7 +238,7 @@ model Product {
   imageUrl     String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime @default(now()) @updatedAt
 
   payments  Payment[]
   stockLogs StockLog[]
