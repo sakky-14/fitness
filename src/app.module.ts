@@ -12,21 +12,14 @@ import { PaymentsModule } from './payments/payments.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
 import { ProductsModule } from './products/products.module';
-
+import { ShiftsModule } from './shifts/shifts.module';
+import { TrainersModule } from './trainers/trainers.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
   imports: [
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
-    // ObserveModule.forRoot({
-    //   appKey: 'YOUR_APP_KEY',
-    //   appSecret: 'YOUR_APP_SECRET',
-    //   serviceId: 'api-web',
-    // }),
     PrismaModule,
-
     AuthModule,
     UsersModule,
     PackagesModule,
@@ -35,7 +28,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ExpensesModule,
     ReportsModule,
     ProductsModule,
-
+    ShiftsModule,
+    TrainersModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

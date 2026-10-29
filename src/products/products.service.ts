@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { RestockProductDto } from './dto/restock-product.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
+import { StockLogType } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import { join } from 'path';
@@ -24,13 +27,11 @@ export class ProductsService {
   private async deletePhotoFromStorage(imageUrl: string | null) {
     if (!imageUrl) return;
 
-    // 1. ລົບຮູບໃນ Supabase Storage
     if (this.supabase && imageUrl.includes('/storage/v1/object/public/')) {
       try {
         const urlParts = imageUrl.split(`/${this.bucketName}/`);
         if (urlParts.length > 1) {
-          const filePathInBucket = urlParts[1]; // e.g. "products/550e8400-e29b-41d4-a716-446655440000.jpg"
-
+          const filePathInBucket = urlParts[1];
           const { error } = await this.supabase.storage
             .from(this.bucketName)
             .remove([filePathInBucket]);
@@ -46,7 +47,6 @@ export class ProductsService {
       }
     }
 
-    // 2. ລົບຮູບໃນ Local Disk (ຖ້າມີ)
     if (imageUrl.startsWith('/uploads/products/')) {
       try {
         const localFileName = imageUrl.split('/uploads/products/')[1];
@@ -128,7 +128,6 @@ export class ProductsService {
       }
     }
 
-    // 🛑 ຖ້າມີການອັບເດດ imageUrl ໃໝ່ ຫຼື ສົ່ງ null/empty ເພື່ອລົບຮູບ -> ລົບຮູບເກົ່າໃນ Supabase Storage
     if (dto.imageUrl !== undefined && dto.imageUrl !== product.imageUrl) {
       if (product.imageUrl) {
         await this.deletePhotoFromStorage(product.imageUrl);
@@ -151,11 +150,117 @@ export class ProductsService {
   async remove(id: number) {
     const product = await this.findOne(id);
 
-    // 🛑 ລົບຮູບຂອງສິນຄ້າออกจาก Supabase Storage ຖ້າມີຮູບ
     if (product.imageUrl) {
       await this.deletePhotoFromStorage(product.imageUrl);
     }
 
     return this.prisma.product.delete({ where: { id: Number(id) } });
+  }
+
+  // 7. ສັ່ງຊື້ສິນຄ້າ / ເພີ່ມສະຕັອກ (Restock / Purchase Order)
+  async restock(productId: number, staffId: number, dto: RestockProductDto) {
+    const product = await this.findOne(productId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const previousStock = product.stock;
+      const newStock = previousStock + dto.quantity;
+      const unitCost = dto.unitCostLak !== undefined ? dto.unitCostLak : Number(product.costPriceLak);
+      const totalCostLak = dto.quantity * unitCost;
+
+      // ອັບເດດສະຕັອກສິນຄ້າ
+      const updatedProduct = await tx.product.update({
+        where: { id: productId },
+        data: {
+          stock: newStock,
+          costPriceLak: unitCost,
+        },
+      });
+
+      // ສ້າງ StockLog
+      const stockLog = await tx.stockLog.create({
+        data: {
+          productId,
+          staffId,
+          type: StockLogType.IN_PURCHASE,
+          quantity: dto.quantity,
+          previousStock,
+          newStock,
+          unitCostLak: unitCost,
+          totalCostLak,
+          supplier: dto.supplier || null,
+          reference: dto.reference || null,
+          reason: dto.reason || 'Restock / Purchase Order',
+        },
+        include: {
+          staff: { select: { id: true, name: true } },
+          product: { select: { id: true, name: true, barcode: true } },
+        },
+      });
+
+      return {
+        message: 'ເພີ່ມສະຕັອກສິນຄ້າສຳເລັດ',
+        product: updatedProduct,
+        stockLog,
+      };
+    });
+  }
+
+  // 8. ປັບປຸງສະຕັອກ / ສິນຄ້າເສຍຫາຍ (Adjust Stock / Out Damage)
+  async adjustStock(productId: number, staffId: number, dto: AdjustStockDto) {
+    const product = await this.findOne(productId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const previousStock = product.stock;
+      const newStock = previousStock + dto.quantity;
+
+      if (newStock < 0) {
+        throw new BadRequestException(`ຈຳນວນສະຕັອກບໍ່ພຽງພໍໃຫ້ປັບລົດ (ປັດຈຸບັນມີ ${previousStock})`);
+      }
+
+      const updatedProduct = await tx.product.update({
+        where: { id: productId },
+        data: {
+          stock: newStock,
+        },
+      });
+
+      const stockLog = await tx.stockLog.create({
+        data: {
+          productId,
+          staffId,
+          type: dto.type,
+          quantity: dto.quantity,
+          previousStock,
+          newStock,
+          reason: dto.reason,
+        },
+        include: {
+          staff: { select: { id: true, name: true } },
+          product: { select: { id: true, name: true, barcode: true } },
+        },
+      });
+
+      return {
+        message: 'ປັບປຸງສະຕັອກສຳເລັດ',
+        product: updatedProduct,
+        stockLog,
+      };
+    });
+  }
+
+  // 9. ດຶງປະຫວັດການເຄື່ອນໄຫວສະຕັອກ (Stock Logs)
+  async getStockLogs(productId?: number, limit = 100) {
+    const where: any = {};
+    if (productId) where.productId = Number(productId);
+
+    return this.prisma.stockLog.findMany({
+      where,
+      take: limit,
+      include: {
+        product: { select: { id: true, name: true, barcode: true, category: true } },
+        staff: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

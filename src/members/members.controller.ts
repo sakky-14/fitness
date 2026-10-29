@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe,
-  UseInterceptors, UploadedFile
+  UseInterceptors, UploadedFile, Query
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -178,6 +178,15 @@ export class MembersController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.membersService.findOne(id);
+  }
+
+  @Get(':id/check-ins')
+  getMemberCheckIns(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    return this.membersService.getMemberCheckIns(id, parsedLimit);
   }
 
   @Patch(':id')

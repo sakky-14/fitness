@@ -25,12 +25,11 @@ export class MembersService {
   private async deletePhotoFromStorage(photoUrl: string | null) {
     if (!photoUrl) return;
 
-    // 1. ລົບຮູບໃນ Supabase Storage
     if (this.supabase && photoUrl.includes('/storage/v1/object/public/')) {
       try {
         const urlParts = photoUrl.split(`/${this.bucketName}/`);
         if (urlParts.length > 1) {
-          const filePathInBucket = urlParts[1]; // ຈະໄດ້ 'members/uuid.jpg'
+          const filePathInBucket = urlParts[1];
 
           const { error } = await this.supabase.storage
             .from(this.bucketName)
@@ -47,7 +46,6 @@ export class MembersService {
       }
     }
 
-    // 2. ລົບຮູບໃນ Local Disk (ຖ້າມີ)
     if (photoUrl.startsWith('/uploads/members/')) {
       try {
         const localFileName = photoUrl.split('/uploads/members/')[1];
@@ -59,6 +57,21 @@ export class MembersService {
         console.error('❌ Failed to delete local image:', err);
       }
     }
+  }
+
+  // Helper function to calculate member status
+  private computeStatus(member: any): 'ACTIVE' | 'EXPIRED' | 'NO_PACKAGE' {
+    if (!member.packageId && (!member.memberPackages || member.memberPackages.length === 0)) {
+      return 'NO_PACKAGE';
+    }
+    const now = new Date();
+    if (member.expireDate && member.expireDate < now) {
+      return 'EXPIRED';
+    }
+    if (member.remainingSessions !== null && member.remainingSessions !== undefined && member.remainingSessions <= 0) {
+      return 'EXPIRED';
+    }
+    return 'ACTIVE';
   }
 
   // 1. ສ້າງສະມາຊິກໃໝ່
@@ -81,33 +94,30 @@ export class MembersService {
     let calculatedRemainingSessions: number | null | undefined = null;
     let calculatedExpireDate = dto.expireDate ? new Date(dto.expireDate) : null;
 
+    let pkg = null;
     if (packageId) {
-      const pkg = await this.prisma.package.findUnique({
+      pkg = await this.prisma.package.findUnique({
         where: { id: packageId },
       });
       if (!pkg) {
         throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
       }
 
-      // 👉 ດຶງຄ່າ sessions ຈາກ package ມາໃຊ້ໂດຍກົງ
       calculatedRemainingSessions = pkg.sessions ?? null;
 
-      if (!calculatedExpireDate && pkg.durationDays) {
+      if (!calculatedExpireDate) {
         const now = new Date();
-        const expire = new Date(now);
-        expire.setDate(expire.getDate() + pkg.durationDays);
-        calculatedExpireDate = expire;
+        if (pkg.durationDays) {
+          const expire = new Date(now);
+          expire.setDate(expire.getDate() + pkg.durationDays);
+          calculatedExpireDate = expire;
+        } else if (pkg.durationHours) {
+          calculatedExpireDate = new Date(now.getTime() + pkg.durationHours * 60 * 60 * 1000);
+        }
       }
-    } else {
-      calculatedRemainingSessions =
-        dto.remainingSessions !== undefined &&
-          dto.remainingSessions !== null &&
-          (dto.remainingSessions as any) !== ''
-          ? Number(dto.remainingSessions)
-          : null;
     }
 
-    return this.prisma.member.create({
+    const member = await this.prisma.member.create({
       data: {
         code: dto.code,
         fullName: dto.fullName,
@@ -117,31 +127,81 @@ export class MembersService {
         expireDate: calculatedExpireDate,
         remainingSessions: calculatedRemainingSessions,
       },
-      include: { package: true },
+      include: {
+        package: true,
+      },
     });
+
+    // ຖ້າມີ Package ໃຫ້ສ້າງ MemberPackage Record ເພື່ອຮອງຮັບ Session & PT Hours
+    if (pkg) {
+      await this.prisma.memberPackage.create({
+        data: {
+          memberId: member.id,
+          packageId: pkg.id,
+          startDate: new Date(),
+          expireDate: calculatedExpireDate,
+          totalSessions: pkg.sessions || 0,
+          remainingSessions: pkg.sessions || 0,
+          totalPtHours: pkg.ptHours || 0,
+          remainingPtHours: pkg.ptHours || 0,
+          isActive: true,
+        },
+      });
+    }
+
+    return {
+      ...member,
+      status: this.computeStatus(member),
+    };
   }
 
   // 2. ດຶງລາຍຊື່ສະມາຊິກທັງໝົດ
   async findAll() {
-    return this.prisma.member.findMany({
-      include: { package: true },
+    const members = await this.prisma.member.findMany({
+      include: {
+        package: true,
+        memberPackages: {
+          include: { package: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        _count: { select: { checkIns: true } },
+      },
       orderBy: { id: 'desc' },
     });
+
+    return members.map((m) => ({
+      ...m,
+      status: this.computeStatus(m),
+    }));
   }
 
   // 3. ດຶງຂໍ້ມູນສະມາຊິກຕາມ ID
   async findOne(id: number) {
     const member = await this.prisma.member.findUnique({
       where: { id: Number(id) },
-      include: { package: true },
+      include: {
+        package: true,
+        memberPackages: {
+          include: { package: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        checkIns: {
+          take: 10,
+          orderBy: { checkInAt: 'desc' },
+        },
+        _count: { select: { checkIns: true, ptSessions: true } },
+      },
     });
     if (!member) {
       throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນສະມາຊິກນີ້');
     }
-    return member;
+    return {
+      ...member,
+      status: this.computeStatus(member),
+    };
   }
 
-  // 4. ແກ້ໄຂຂໍ້ມູນສະມາຊິກ (ອັບເດດ/ລົບຮູບເກົ່າ)
+  // 4. ແກ້ໄຂຂໍ້ມູນສະມາຊິກ
   async update(id: number, dto: UpdateMemberDto) {
     const member = await this.findOne(id);
 
@@ -164,7 +224,6 @@ export class MembersService {
         throw new NotFoundException('ບໍ່ພົບຂໍ້ມູນແພັກເກັດນີ້');
       }
 
-      // 👉 ຖ້າປ່ຽນ Package ໃຫ້ດຶງ sessions ຂອງ package ໃໝ່ມາໃສ່ອັດຕະໂນມັດ
       dataToUpdate.remainingSessions = pkg.sessions ?? null;
 
       if (!dto.expireDate && pkg.durationDays) {
@@ -185,11 +244,16 @@ export class MembersService {
       dataToUpdate.expireDate = new Date(dto.expireDate);
     }
 
-    return this.prisma.member.update({
+    const updated = await this.prisma.member.update({
       where: { id: Number(id) },
       data: dataToUpdate,
       include: { package: true },
     });
+
+    return {
+      ...updated,
+      status: this.computeStatus(updated),
+    };
   }
 
   // 5. ລົບສະມາຊິກ (ລົບຮູບໃນ Storage ພ້ອມ)
@@ -205,7 +269,7 @@ export class MembersService {
     });
   }
 
-  // ⚡ 6. ລະບົບ Scan Check-in + Anti-Passback Logic (1 ນາທີ)
+  // ⚡ 6. ລະບົບ Scan Check-in + Anti-Passback Logic (1 ນາທີ) + ບັນທຶກລົງ CheckIn Table
   async checkIn(dto: CheckInDto) {
     const member = await this.prisma.member.findUnique({
       where: { code: dto.code },
@@ -218,6 +282,7 @@ export class MembersService {
 
     const now = new Date();
 
+    // 1. Anti-Passback Check
     if (member.lastCheckIn) {
       const diffInMs = now.getTime() - member.lastCheckIn.getTime();
       const diffInMinutes = diffInMs / (1000 * 60);
@@ -231,10 +296,12 @@ export class MembersService {
       }
     }
 
+    // 2. Expiration Check
     if (member.expireDate && member.expireDate < now) {
       throw new BadRequestException('ແພັກເກັດສະມາຊິກຂອງທ່ານ ໝົດອາຍຸແລ້ວ!');
     }
 
+    // 3. Sessions Quota Check
     let currentSessions = member.remainingSessions;
     if (currentSessions === null || currentSessions === undefined) {
       currentSessions = member.package?.sessions ?? null;
@@ -246,40 +313,61 @@ export class MembersService {
       }
     }
 
-    const updateData: any = {
-      lastCheckIn: now,
-    };
+    // 4. Update Member & Record in CheckIn history within Transaction
+    return this.prisma.$transaction(async (tx) => {
+      const updateData: any = {
+        lastCheckIn: now,
+      };
 
-    if (currentSessions !== null && currentSessions !== undefined) {
-      updateData.remainingSessions = currentSessions - 1;
-    }
+      if (currentSessions !== null && currentSessions !== undefined) {
+        updateData.remainingSessions = currentSessions - 1;
+      }
 
-    const updatedMember = await this.prisma.member.update({
-      where: { id: member.id },
-      data: updateData,
-      include: { package: true },
+      const updatedMember = await tx.member.update({
+        where: { id: member.id },
+        data: updateData,
+        include: { package: true },
+      });
+
+      // ບັນທຶກປະຫວັດ CheckIn ລົງຕາຕະລາງ CheckIn
+      await tx.checkIn.create({
+        data: {
+          memberId: member.id,
+          checkInAt: now,
+        },
+      });
+
+      let remainingDays: number | null = null;
+      if (updatedMember.expireDate) {
+        const diffInMs = updatedMember.expireDate.getTime() - now.getTime();
+        remainingDays = Math.max(0, Math.floor(diffInMs / (1000 * 60 * 60 * 24)));
+      }
+
+      return {
+        message: 'Check-in ສຳເລັດ!',
+        status: 'SUCCESS',
+        member: {
+          id: updatedMember.id,
+          fullName: updatedMember.fullName,
+          code: updatedMember.code,
+          photoUrl: updatedMember.photoUrl,
+          packageName: updatedMember.package?.name || 'N/A',
+          remainingSessions: updatedMember.remainingSessions,
+          remainingDays: remainingDays,
+          expireDate: updatedMember.expireDate,
+          lastCheckIn: updatedMember.lastCheckIn,
+          membershipStatus: this.computeStatus(updatedMember),
+        },
+      };
     });
+  }
 
-    let remainingDays: number | null = null;
-    if (updatedMember.expireDate) {
-      const diffInMs = updatedMember.expireDate.getTime() - now.getTime();
-      remainingDays = Math.max(0, Math.floor(diffInMs / (1000 * 60 * 60 * 24)));
-    }
-
-    return {
-      message: 'Check-in ສຳເລັດ!',
-      status: 'SUCCESS',
-      member: {
-        id: updatedMember.id,
-        fullName: updatedMember.fullName,
-        code: updatedMember.code,
-        photoUrl: updatedMember.photoUrl,
-        packageName: updatedMember.package?.name || 'N/A',
-        remainingSessions: updatedMember.remainingSessions,
-        remainingDays: remainingDays,
-        expireDate: updatedMember.expireDate,
-        lastCheckIn: updatedMember.lastCheckIn,
-      },
-    };
+  // 7. ດຶງປະຫວັດການ Check-in ຂອງສະມາຊິກ
+  async getMemberCheckIns(memberId: number, limit = 50) {
+    return this.prisma.checkIn.findMany({
+      where: { memberId: Number(memberId) },
+      take: limit,
+      orderBy: { checkInAt: 'desc' },
+    });
   }
 }

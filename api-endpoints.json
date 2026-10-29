@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8f2a1b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
     "name": "Gym Management API",
-    "description": "Gym Management API Collection - Ready for Postman Import\n\n### Key Features:\n- **Auto Authentication**: Logging in automatically saves `access_token` to `{{token}}` variable.\n- **Bearer Token**: All protected endpoints inherit Bearer Token from collection auth.\n- **Base URL**: Managed via `{{baseUrl}}` variable (Default: http://localhost:3000).",
+    "description": "Gym Management API Collection - Ready for Postman Import\n\n### Key Features:\n- **Auto Authentication**: Logging in automatically saves `access_token` to `{{token}}` variable.\n- **Bearer Token**: All protected endpoints inherit Bearer Token from collection auth.\n- **Base URL**: Managed via `{{baseUrl}}` variable (Default: http://localhost:3000).\n- **RBAC Roles**: ADMIN, CASHIER, TRAINER, STAFF.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -77,7 +77,7 @@
                 "login"
               ]
             },
-            "description": "Login ເຂົ້າສູ່ລະບົບ — ຄືນ JWT Token (ບັນທຶກ access_token ເຂົ້າ variable {{token}} ອັດໂນມັດ)"
+            "description": "Login ເຂົ້າສູ່ລະບົບ — ຄືນ JWT Token ແລະ ບັນທຶກ Audit Log ອັດໂນມັດ (ບັນທຶກ access_token ເຂົ້າ variable {{token}})"
           }
         },
         {
@@ -95,7 +95,32 @@
                 "me"
               ]
             },
-            "description": "ດຶງຂໍ້ມູນ Profile ຂອງ Token ປັດຈຸບັນ (ADMIN, STAFF)"
+            "description": "ດຶງຂໍ້ມູນ Profile ຂອງ Token ປັດຈຸບັນ (ADMIN, CASHIER, TRAINER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Login Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/audit-logs?limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "ຈຳນວນ log ທີ່ຕ້ອງການດຶງ (Default: 100)"
+                }
+              ]
+            },
+            "description": "ດຶງປະຫວັດການ Login ເຂົ້າສູ່ລະບົບພ້ອມ IP Address ແລະ User Agent (ADMIN Only)"
           }
         }
       ]
@@ -115,7 +140,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"John Doe\",\n  \"phone\": \"02099998888\",\n  \"password\": \"password123\",\n  \"role\": \"STAFF\"\n}",
+              "raw": "{\n  \"name\": \"John Cashier\",\n  \"phone\": \"02099998888\",\n  \"password\": \"password123\",\n  \"role\": \"CASHIER\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -131,7 +156,7 @@
                 "users"
               ]
             },
-            "description": "ສ້າງ Staff / Admin ໃໝ່ (ADMIN Only)"
+            "description": "ສ້າງ Staff / Admin / Cashier / Trainer ໃໝ່ (ADMIN Only). Role: ADMIN, CASHIER, TRAINER, STAFF"
           }
         },
         {
@@ -188,7 +213,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"phone\": \"02099998888\",\n  \"role\": \"STAFF\"\n}",
+              "raw": "{\n  \"name\": \"Jane Cashier Updated\",\n  \"phone\": \"02099998888\",\n  \"role\": \"CASHIER\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -243,6 +268,150 @@
       ]
     },
     {
+      "name": "Shift Management",
+      "item": [
+        {
+          "name": "Open Shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startCashLak\": 500000,\n  \"startCashThb\": 1000,\n  \"startCashUsd\": 50,\n  \"notes\": \"ເປີດກະເຊົ້າ (Morning Shift)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/open",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "open"
+              ]
+            },
+            "description": "ເປີດກະເງິນສົດໃໝ່ (Open Shift) ພ້ອມບັນທຶກເງິນທອນເລີ່ມຕົ້ນ LAK, THB, USD (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Current Active Shift",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "current"
+              ]
+            },
+            "description": "ດຶງສະຖານະ ແລະ ຍອດຂາຍປະຈຸບັນຂອງກະທີ່ກຳລັງເປີດຢູ່ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Close Shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actualCashLak\": 1850000,\n  \"actualCashThb\": 2500,\n  \"actualCashUsd\": 120,\n  \"notes\": \"ປິດກະທ່ຽງຄືນ ນັບເງິນຄົບຖ້ວນ\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/:id/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                ":id",
+                "close"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Shift ID"
+                }
+              ]
+            },
+            "description": "ປິດກະ (Close Shift) ພ້ອມບັນທຶກເງິນສົດທີ່ນັບໄດ້ຕົວຈິງ ແລະ ຄິດໄລ່ເງິນຂາດ/ເກີນ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get All Shifts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/shifts?status=OPEN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "OPEN",
+                  "description": "OPEN ຫຼື CLOSED (Optional)"
+                }
+              ]
+            },
+            "description": "ດຶງລາຍການກະເງິນສົດທັງໝົດ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get Shift by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Shift ID"
+                }
+              ]
+            },
+            "description": "ດຶງຂໍ້ມູນລາຍລະອຽດກະຕາມ ID (ADMIN, CASHIER, STAFF)"
+          }
+        }
+      ]
+    },
+    {
       "name": "Members",
       "item": [
         {
@@ -274,7 +443,7 @@
                 "check-in"
               ]
             },
-            "description": "Scan QR/Barcode Check-in — Anti-Passback 15 ນາທີ (ADMIN, STAFF)"
+            "description": "Scan QR/Barcode Check-in — ຮອງຮັບທຸກ PackageType, ມີ Anti-Passback 15 ນາທີ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -289,7 +458,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"code\": \"MEM001\",\n  \"fullName\": \"Somchai\",\n  \"phone\": \"02055554444\",\n  \"photoUrl\": \"http://example.com/photo.jpg\",\n  \"packageId\": 1,\n  \"expireDate\": \"2026-12-31\",\n  \"remainingSessions\": 10\n}",
+              "raw": "{\n  \"code\": \"MEM001\",\n  \"fullName\": \"Somchai Xayyavong\",\n  \"phone\": \"02055554444\",\n  \"photoUrl\": \"https://images.unsplash.com/photo-1534528741775-53994a69daeb\",\n  \"packageId\": 1,\n  \"expireDate\": \"2026-12-31\",\n  \"remainingSessions\": 10,\n  \"remainingPtHours\": 5.0\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -305,7 +474,7 @@
                 "members"
               ]
             },
-            "description": "ລົງທະບຽນສະມາຊິກໃໝ່ (ADMIN, STAFF)"
+            "description": "ລົງທະບຽນສະມາຊິກໃໝ່ (ADMIN, CASHIER, STAFF). ຮອງຮັບທັງ JSON (photoUrl) ຫຼື Multipart Form-data (photo)"
           }
         },
         {
@@ -322,7 +491,7 @@
                 "members"
               ]
             },
-            "description": "ດຶງລາຍຊື່ສະມາຊິກທັງໝົດ (ADMIN, STAFF)"
+            "description": "ດຶງລາຍຊື່ສະມາຊິກທັງໝົດ ພ້ອມສະຖານະ Package (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -347,7 +516,40 @@
                 }
               ]
             },
-            "description": "ດຶງຂໍ້ມູນສະມາຊິກຕາມ ID (ADMIN, STAFF)"
+            "description": "ດຶງຂໍ້ມູນສະມາຊິກຕາມ ID (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Member Check-In History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/:id/check-ins?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                ":id",
+                "check-ins"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "ຈຳນວນປະຫວັດທີ່ຕ້ອງການດຶງ (Default: 50)"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Member ID"
+                }
+              ]
+            },
+            "description": "ດຶງປະຫວັດການ Scan ເຂົ້າຢິມຂອງສະມາຊິກຄົນນີ້ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -362,7 +564,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Somchai Updated\",\n  \"phone\": \"02055554444\"\n}",
+              "raw": "{\n  \"fullName\": \"Somchai Xayyavong Updated\",\n  \"phone\": \"02055554444\",\n  \"status\": \"ACTIVE\",\n  \"remainingSessions\": 8\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -386,7 +588,7 @@
                 }
               ]
             },
-            "description": "ແກ້ໄຂຂໍ້ມູນສະມາຊິກ (ADMIN, STAFF)"
+            "description": "ແກ້ໄຂຂໍ້ມູນສະມາຊິກ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -431,7 +633,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Monthly Pass\",\n  \"priceLak\": 350000,\n  \"durationDays\": 30,\n  \"sessions\": 0\n}",
+              "raw": "{\n  \"name\": \"1 Month Unlimited Pass\",\n  \"type\": \"TIME_BASED\",\n  \"priceLak\": 350000,\n  \"durationDays\": 30,\n  \"isActive\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -447,7 +649,7 @@
                 "packages"
               ]
             },
-            "description": "ສ້າງແພັກເກັດໃໝ່ (ADMIN Only)"
+            "description": "ສ້າງແພັກເກັດໃໝ່ (ADMIN Only). ຮອງຮັບ PackageType: TIME_BASED, SESSION_BASED, DAY_PASS, PT_ONLY"
           }
         },
         {
@@ -464,7 +666,7 @@
                 "packages"
               ]
             },
-            "description": "ດຶງລາຍການແພັກເກັດທັງໝົດ (ADMIN, STAFF)"
+            "description": "ດຶງລາຍການແພັກເກັດທັງໝົດ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -489,7 +691,7 @@
                 }
               ]
             },
-            "description": "ດຶງຂໍ້ມູນແພັກເກັດຕາມ ID (ADMIN, STAFF)"
+            "description": "ດຶງຂໍ້ມູນແພັກເກັດຕາມ ID (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -504,7 +706,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"VIP Monthly Pass\",\n  \"priceLak\": 400000\n}",
+              "raw": "{\n  \"name\": \"VIP Monthly Pass Updated\",\n  \"priceLak\": 400000,\n  \"isActive\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -559,6 +761,258 @@
       ]
     },
     {
+      "name": "Trainers & PT Sessions",
+      "item": [
+        {
+          "name": "Create Trainer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Coach Alex\",\n  \"phone\": \"02055667788\",\n  \"specialty\": \"Bodybuilding & Weight Loss\",\n  \"commissionRate\": 25,\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/trainers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers"
+              ]
+            },
+            "description": "ສ້າງ Trainer ໃໝ່ ພ້ອມກຳນົດເປີເຊັນຄ່າຄອມມິດຊັ່ນ commissionRate (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get All Trainers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trainers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers"
+              ]
+            },
+            "description": "ດຶງລາຍຊື່ Trainer ທັງໝົດ (ADMIN, CASHIER, TRAINER, STAFF)"
+          }
+        },
+        {
+          "name": "Record PT Session (Deduct Hours)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": 1,\n  \"trainerId\": 1,\n  \"hoursDeducted\": 1.0,\n  \"sessionDate\": \"2026-10-28T10:00:00.000Z\",\n  \"notes\": \"Upper body & core workout\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/trainers/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers",
+                "sessions"
+              ]
+            },
+            "description": "ບັນທຶກການສອນ PT — ຕັດຊົ່ວໂມງ PT ຂອງສະມາຊິກອັດໂນມັດ (ADMIN, TRAINER, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get All PT Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trainers/sessions?trainerId=&memberId=&startDate=&endDate=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "trainerId",
+                  "value": "",
+                  "description": "ID ເທຣນເນີ (Optional)"
+                },
+                {
+                  "key": "memberId",
+                  "value": "",
+                  "description": "ID ສະມາຊິກ (Optional)"
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "description": "YYYY-MM-DD (Optional)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "description": "YYYY-MM-DD (Optional)"
+                }
+              ]
+            },
+            "description": "ດຶງປະຫວັດການສອນ PT ທັງໝົດ ພ້ອມ Filter ຕາມ Trainer, Member, ວັນທີ"
+          }
+        },
+        {
+          "name": "Get Trainer Performance & Commission",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trainers/:id/performance?startDate=2026-10-01&endDate=2026-10-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers",
+                ":id",
+                "performance"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-10-01",
+                  "description": "YYYY-MM-DD"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-10-31",
+                  "description": "YYYY-MM-DD"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Trainer ID"
+                }
+              ]
+            },
+            "description": "ສະຫຼຸບຜົນງານ, ຊົ່ວໂມງສອນ, ແລະ ຄ່າຄອມມິດຊັ່ນຂອງ Trainer (ADMIN, TRAINER)"
+          }
+        },
+        {
+          "name": "Get Trainer by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trainers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Trainer ID"
+                }
+              ]
+            },
+            "description": "ດຶງຂໍ້ມູນ Trainer ຕາມ ID"
+          }
+        },
+        {
+          "name": "Update Trainer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Coach Alex Pro\",\n  \"commissionRate\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/trainers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Trainer ID"
+                }
+              ]
+            },
+            "description": "ແກ້ໄຂຂໍ້ມູນ Trainer (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Delete Trainer",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trainers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "trainers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Trainer ID"
+                }
+              ]
+            },
+            "description": "ລົບ Trainer (ADMIN Only)"
+          }
+        }
+      ]
+    },
+    {
       "name": "Payments",
       "item": [
         {
@@ -589,7 +1043,7 @@
                 "payments"
               ]
             },
-            "description": "ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກອັດໂນມັດ (ADMIN, STAFF)"
+            "description": "ບັນທຶກການຊຳລະເງິນ + ອັບເດດ Package ສະມາຊິກອັດໂນມັດ ແລະ ຜູກເຂົ້າກະເງິນສົດ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -606,7 +1060,26 @@
                 "payments"
               ]
             },
-            "description": "ດຶງປະຫວັດການຊຳລະເງິນທັງໝົດ (ADMIN, STAFF)"
+            "description": "ດຶງປະຫວັດການຊຳລະເງິນທັງໝົດ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Total Revenue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/revenue/total",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "revenue",
+                "total"
+              ]
+            },
+            "description": "ດຶງຍອດລາຍຮັບລວມທັງໝົດໃນລະບົບ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -631,7 +1104,331 @@
                 }
               ]
             },
-            "description": "ດຶງໃບບິນຕາມ ID (ADMIN, STAFF)"
+            "description": "ດຶງໃບບິນຕາມ ID (ADMIN, CASHIER, STAFF)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products & Inventory",
+      "item": [
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"barcode\": \"8850001234567\",\n  \"name\": \"Whey Protein 1kg\",\n  \"category\": \"Supplements\",\n  \"costPriceLak\": 350000,\n  \"priceLak\": 450000,\n  \"stock\": 20,\n  \"imageUrl\": \"https://images.unsplash.com/photo-1579722821273-0f6c7d44362f\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "description": "ສ້າງສິນຄ້າໃໝ່ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?search=&category=&isActive=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "ຄົ້ນຫາຕາມຊື່ ຫຼື Barcode"
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "ໝວດໝູ່ສິນຄ້າ"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "true / false"
+                }
+              ]
+            },
+            "description": "ດຶງລາຍການສິນຄ້າທັງໝົດ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Product by Barcode",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/barcode/:barcode",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "barcode",
+                ":barcode"
+              ],
+              "variable": [
+                {
+                  "key": "barcode",
+                  "value": "8850001234567",
+                  "description": "Barcode ສິນຄ້າ"
+                }
+              ]
+            },
+            "description": "ດຶງສິນຄ້າຕາມ Barcode ສຳລັບ Scan ຂາຍໜ້າຮ້ານ POS (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Product ID"
+                }
+              ]
+            },
+            "description": "ດຶງຂໍ້ມູນສິນຄ້າຕາມ ID (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Restock Product (Purchase Order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 24,\n  \"unitCostLak\": 350000,\n  \"supplier\": \"Nutrition Lao Co.,Ltd\",\n  \"reference\": \"PO-2026-001\",\n  \"reason\": \"ສັ່ງຊື້ສິນຄ້າປະຈຳເດືອນ\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/restock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id",
+                "restock"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Product ID"
+                }
+              ]
+            },
+            "description": "ເພີ່ມສະຕັອກສິນຄ້າ (Purchase Order / Restock) ພ້ອມບັນທຶກ StockLog IN_PURCHASE ອັດໂນມັດ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Adjust Stock (Damage / Counting Audit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"OUT_DAMAGE\",\n  \"quantity\": -2,\n  \"reason\": \"ສິນຄ້າແຕກຫັກຊຳລຸດລະຫວ່າງຍົກຍ້າຍ\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/adjust-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id",
+                "adjust-stock"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Product ID"
+                }
+              ]
+            },
+            "description": "ປັບປຸງສະຕັອກ / ສິນຄ້າເສຍຫາຍ (ADJUSTMENT ຫຼື OUT_DAMAGE) ພ້ອມບັນທຶກ StockLog (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Product Stock Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id/stock-logs?limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id",
+                "stock-logs"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "ຈຳນວນ log ທີ່ຕ້ອງການດຶງ (Default: 100)"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Product ID"
+                }
+              ]
+            },
+            "description": "ດຶງປະຫວັດການເຄື່ອນໄຫວສະຕັອກຂອງສິນຄ້າສະເພາະ ID (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get All Stock Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/stock-logs/all?limit=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "stock-logs",
+                "all"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "ຈຳນວນ log ທີ່ຕ້ອງການດຶງ (Default: 100)"
+                }
+              ]
+            },
+            "description": "ດຶງປະຫວັດການເຄື່ອນໄຫວສະຕັອກສິນຄ້າທັງໝົດໃນລະບົບ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Whey Protein 1kg Gold Standard\",\n  \"priceLak\": 480000,\n  \"stock\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Product ID"
+                }
+              ]
+            },
+            "description": "ແກ້ໄຂຂໍ້ມູນສິນຄ້າ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Product ID"
+                }
+              ]
+            },
+            "description": "ລົບສິນຄ້າ (ADMIN Only)"
           }
         }
       ]
@@ -651,7 +1448,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"ຄ່ານ້ຳປະປາ\",\n  \"category\": \"UTILITIES\",\n  \"amountLak\": 150000,\n  \"paidCurrency\": \"LAK\",\n  \"exchangeRate\": 1,\n  \"amountPaid\": 150000,\n  \"receiptUrl\": \"http://example.com/receipt.jpg\"\n}",
+              "raw": "{\n  \"title\": \"ຄ່ານ້ຳປະປາ\",\n  \"category\": \"UTILITIES\",\n  \"amountLak\": 150000,\n  \"paidCurrency\": \"LAK\",\n  \"exchangeRate\": 1,\n  \"amountPaid\": 150000,\n  \"receiptUrl\": \"https://images.unsplash.com/photo-1554224155-8d04cb21cd6c\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -667,7 +1464,7 @@
                 "expenses"
               ]
             },
-            "description": "ບັນທຶກລາຍຈ່າຍໃໝ່ (ADMIN, STAFF)"
+            "description": "ບັນທຶກລາຍຈ່າຍໃໝ່ (ADMIN, CASHIER, STAFF). Category: SUPPLIES, UTILITIES, MAINTENANCE, SALARY, MARKETING, RENT, MISCELLANEOUS"
           }
         },
         {
@@ -684,7 +1481,52 @@
                 "expenses"
               ]
             },
-            "description": "ດຶງລາຍການລາຍຈ່າຍທັງໝົດ (ADMIN, STAFF)"
+            "description": "ດຶງລາຍການລາຍຈ່າຍທັງໝົດ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Total Expense",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/expense/total",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                "expense",
+                "total"
+              ]
+            },
+            "description": "ດຶງຍອດລວມລາຍຈ່າຍທັງໝົດ (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Monthly Expense Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/summary/monthly?year=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                "summary",
+                "monthly"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026",
+                  "description": "ປີທີ່ຕ້ອງການເບິ່ງ (Default: ປີປັດຈຸບັນ)"
+                }
+              ]
+            },
+            "description": "ສະຫຼຸບຍອດລາຍຈ່າຍແຍກຕາມເດືອນ ແລະ ແຍກຕາມໝວດໝູ່ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -709,7 +1551,7 @@
                 }
               ]
             },
-            "description": "ດຶງລາຍຈ່າຍຕາມ ID (ADMIN, STAFF)"
+            "description": "ດຶງລາຍຈ່າຍຕາມ ID (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -724,7 +1566,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"ຄ່ານ້ຳປະປາ ແລະ ຄ່າໄຟ\",\n  \"amountLak\": 200000\n}",
+              "raw": "{\n  \"title\": \"ຄ່ານ້ຳປະປາ ແລະ ຄ່າໄຟຟ້າ\",\n  \"amountLak\": 200000\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -748,7 +1590,7 @@
                 }
               ]
             },
-            "description": "ແກ້ໄຂລາຍຈ່າຍ (ADMIN, STAFF)"
+            "description": "ແກ້ໄຂລາຍຈ່າຍ (ADMIN, CASHIER, STAFF)"
           }
         },
         {
@@ -779,15 +1621,15 @@
       ]
     },
     {
-      "name": "Reports",
+      "name": "Reports & Analytics",
       "item": [
         {
-          "name": "Get Financial Report",
+          "name": "Get Financial Report (P&L)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/reports/financial?startDate=2026-09-01&endDate=2026-09-30",
+              "raw": "{{baseUrl}}/reports/financial?startDate=2026-10-01&endDate=2026-10-31",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -798,17 +1640,97 @@
               "query": [
                 {
                   "key": "startDate",
-                  "value": "2026-09-01",
-                  "description": "YYYY-MM-DD (default: ວັນທີ 1 ຂອງເດືອນ)"
+                  "value": "2026-10-01",
+                  "description": "YYYY-MM-DD"
                 },
                 {
                   "key": "endDate",
-                  "value": "2026-09-30",
-                  "description": "YYYY-MM-DD (default: ມື້ນີ້)"
+                  "value": "2026-10-31",
+                  "description": "YYYY-MM-DD"
                 }
               ]
             },
-            "description": "ລາຍງານການເງິນ (ກຳໄລ-ຂາດທຶນ) — ADMIN Only"
+            "description": "ລາຍງານການເງິນ (ກຳໄລ-ຂາດທຶນ) ພ້ອມ Revenue, Expenses, Net Profit (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get Daily P&L",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/daily-pl?date=2026-10-28",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "daily-pl"
+              ],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-10-28",
+                  "description": "YYYY-MM-DD (Default: ມື້ນີ້)"
+                }
+              ]
+            },
+            "description": "ລາຍງານກຳໄລ-ຂາດທຶນປະຈຳວັນ (Daily P&L) ແຍກຕາມ Currency ແລະ Payment Method (ADMIN, CASHIER, STAFF)"
+          }
+        },
+        {
+          "name": "Get Monthly Financial Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/monthly-breakdown?year=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "monthly-breakdown"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026",
+                  "description": "YYYY (Default: ປີປັດຈຸບັນ)"
+                }
+              ]
+            },
+            "description": "ສະຫຼຸບງົບການເງິນລາຍເດືອນຕະຫຼອດປີ: ລາຍຮັບ, ລາຍຈ່າຍ, ກຳໄລສຸດທິ (ADMIN Only)"
+          }
+        },
+        {
+          "name": "Get Attendance & Member Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/attendance-analytics?startDate=2026-10-01&endDate=2026-10-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "attendance-analytics"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-10-01",
+                  "description": "YYYY-MM-DD (Optional)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-10-31",
+                  "description": "YYYY-MM-DD (Optional)"
+                }
+              ]
+            },
+            "description": "ວິເຄາະສະຖິຕິການເຂົ້າໃຊ້ງານ (Peak Hours, Peak Days) ແລະ ສະມາຊິກ Active vs Inactive (ADMIN, CASHIER, STAFF, TRAINER)"
           }
         },
         {
@@ -817,7 +1739,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/reports/check-ins?startDate=2026-09-01&endDate=2026-09-30",
+              "raw": "{{baseUrl}}/reports/check-ins?startDate=2026-10-01&endDate=2026-10-31",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -828,202 +1750,17 @@
               "query": [
                 {
                   "key": "startDate",
-                  "value": "2026-09-01",
+                  "value": "2026-10-01",
                   "description": "YYYY-MM-DD"
                 },
                 {
                   "key": "endDate",
-                  "value": "2026-09-30",
+                  "value": "2026-10-31",
                   "description": "YYYY-MM-DD"
                 }
               ]
             },
-            "description": "ລາຍງານສະຖິຕິສະມາຊິກ & Check-in (ADMIN, STAFF)"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Products",
-      "item": [
-        {
-          "name": "Create Product",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"barcode\": \"8850001234567\",\n  \"name\": \"Whey Protein 1kg\",\n  \"category\": \"Supplements\",\n  \"costPriceLak\": 350000,\n  \"priceLak\": 450000,\n  \"stock\": 20,\n  \"imageUrl\": \"http://example.com/product.jpg\",\n  \"isActive\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/products",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "products"
-              ]
-            },
-            "description": "ສ້າງสินค้าໃໝ່ (ADMIN Only)"
-          }
-        },
-        {
-          "name": "Get All Products",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/products?search=&category=&isActive=true",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "products"
-              ],
-              "query": [
-                {
-                  "key": "search",
-                  "value": "",
-                  "description": "ค้นหาด้วยชื่อ หรือ บาร์โค้ด"
-                },
-                {
-                  "key": "category",
-                  "value": "",
-                  "description": "หมวดหมู่สินค้า"
-                },
-                {
-                  "key": "isActive",
-                  "value": "true",
-                  "description": " true / false"
-                }
-              ]
-            },
-            "description": "ດຶງລາຍການสินค้าທັງໝົດ (ADMIN, STAFF)"
-          }
-        },
-        {
-          "name": "Get Product by Barcode",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/products/barcode/:barcode",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "products",
-                "barcode",
-                ":barcode"
-              ],
-              "variable": [
-                {
-                  "key": "barcode",
-                  "value": "8850001234567",
-                  "description": "Barcode สินค้า"
-                }
-              ]
-            },
-            "description": "ດຶງสินค้าຕາມ Barcode สำหรับ Scan ขายหน้าร้าน (ADMIN, STAFF)"
-          }
-        },
-        {
-          "name": "Get Product by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/products/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "products",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "1",
-                  "description": "Product ID"
-                }
-              ]
-            },
-            "description": "ດຶງຂໍ້ມູນสินค้าຕາມ ID (ADMIN, STAFF)"
-          }
-        },
-        {
-          "name": "Update Product",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Whey Protein 1kg Updated\",\n  \"priceLak\": 480000,\n  \"stock\": 25\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/products/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "products",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "1",
-                  "description": "Product ID"
-                }
-              ]
-            },
-            "description": "ແກ້ໄຂຂໍ້ມູນสินค้า (ADMIN Only)"
-          }
-        },
-        {
-          "name": "Delete Product",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/products/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "products",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "1",
-                  "description": "Product ID"
-                }
-              ]
-            },
-            "description": "ລົບสินค้า (ADMIN Only)"
+            "description": "ລາຍງານສະຖິຕິສະມາຊິກ & Check-in (ADMIN, CASHIER, STAFF)"
           }
         }
       ]

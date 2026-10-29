@@ -12,9 +12,13 @@ export class PackagesService {
     return this.prisma.package.create({
       data: {
         name: dto.name,
+        type: dto.type,
         priceLak: dto.priceLak,
         durationDays: dto.durationDays,
+        durationHours: dto.durationHours,
         sessions: dto.sessions,
+        ptHours: dto.ptHours,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
     });
   }
@@ -39,7 +43,7 @@ export class PackagesService {
 
   // 4. ແກ້ໄຂ Package
   async update(id: number, dto: UpdatePackageDto) {
-    await this.findOne(id); // ກວດສອບກ່ອນວ່າມີ Package ນີ້ຫຼືບໍ່
+    await this.findOne(id);
     return this.prisma.package.update({
       where: { id },
       data: dto,

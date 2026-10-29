@@ -11,8 +11,8 @@ export class AuthService {
     private jwtService: JwtService,
   ) { }
 
-  async login(dto: LoginDto) {
-    // 1. ຄົ້ນຫາ User ຈາກเบอร์โทรศัพท์[cite: 1, 2]
+  async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
+    // 1. ຄົ້ນຫາ User ຈາກເບີໂທລະສັບ
     const user = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
     });
@@ -21,13 +21,26 @@ export class AuthService {
       throw new UnauthorizedException('ເບີໂທລະສັບ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ');
     }
 
-    // 2. ກວດສອບ Password Hash[cite: 1, 2]
+    // 2. ກວດສອບ Password Hash
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('ເບີໂທລະສັບ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ');
     }
 
-    // 3. ສ້າງ JWT Token
+    // 3. ບັນທຶກ Login Audit Log
+    try {
+      await this.prisma.loginAuditLog.create({
+        data: {
+          userId: user.id,
+          ipAddress: ipAddress || 'Unknown IP',
+          userAgent: userAgent || 'Unknown Client',
+        },
+      });
+    } catch (logErr) {
+      console.error('Failed to create login audit log:', logErr);
+    }
+
+    // 4. ສ້າງ JWT Token
     const payload = { sub: user.id, phone: user.phone, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
@@ -38,5 +51,23 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  // ດຶງປະຫວັດການ Login (Audit Logs) ສຳລັບ ADMIN
+  async getAuditLogs(limit = 100) {
+    return this.prisma.loginAuditLog.findMany({
+      take: limit,
+      orderBy: { loginAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            role: true,
+          },
+        },
+      },
+    });
   }
 }

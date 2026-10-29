@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, ParseIntPipe,
-  UseInterceptors, UploadedFile
+  UseInterceptors, UploadedFile, Request
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -11,6 +11,8 @@ import { createClient } from '@supabase/supabase-js';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { RestockProductDto } from './dto/restock-product.dto';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -50,7 +52,6 @@ async function uploadFileToSupabase(
   }
 
   try {
-    // 🎯 Path ໃນ Bucket ຈະເປັນ products/<uuid>.<ext>
     const filePathInBucket = `${FOLDER_NAME}/${filename}`;
 
     let { data, error } = await supabase.storage
@@ -93,16 +94,14 @@ async function uploadFileToSupabase(
 // 👈 ຟັງຊັນປະມວນຜົນ Uploaded File ໃຫ້ເປັນ UUID Filename 100%
 async function processUploadedFile(file: Express.Multer.File): Promise<string> {
   const ext = extname(file.originalname) || '.jpg';
-  const uuidFilename = `${crypto.randomUUID()}${ext}`; // 👈 ສ້າງ UUID Filename ທີ່ນີ້
+  const uuidFilename = `${crypto.randomUUID()}${ext}`;
   const contentType = file.mimetype || 'image/jpeg';
 
-  // 1. ອັບໂຫລດໄປ Supabase Storage
   const supabasePublicUrl = await uploadFileToSupabase(file.buffer, uuidFilename, contentType);
   if (supabasePublicUrl) {
     return supabasePublicUrl;
   }
 
-  // 2. ຖ້າ Supabase Upload ບໍ່ໄດ້ ໃຫ້ Save ລົງ Local Disk ດ້ວຍ UUID
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
@@ -127,8 +126,7 @@ async function saveBase64Image(base64String: string): Promise<string> {
 
   const base64Data = matches[2].replace(/\s/g, '');
   const dataBuffer = Buffer.from(base64Data, 'base64');
-
-  const uuidFilename = `${crypto.randomUUID()}.${ext}`; // 👈 ສ້າງ UUID Filename
+  const uuidFilename = `${crypto.randomUUID()}.${ext}`;
 
   const supabasePublicUrl = await uploadFileToSupabase(dataBuffer, uuidFilename, contentType);
   if (supabasePublicUrl) {
@@ -174,9 +172,51 @@ export class ProductsController {
     return this.productsService.findAll({ search, category, isActive: activeBool });
   }
 
+  // ດຶງປະຫວັດ Stock Logs ທັງໝົດ
+  @Get('stock-logs/all')
+  @Roles(Role.ADMIN, Role.CASHIER, Role.STAFF)
+  getAllStockLogs(@Query('limit') limit?: string) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 100;
+    return this.productsService.getStockLogs(undefined, parsedLimit);
+  }
+
   @Get('barcode/:barcode')
   findByBarcode(@Param('barcode') barcode: string) {
     return this.productsService.findByBarcode(barcode);
+  }
+
+  @Get(':id/stock-logs')
+  @Roles(Role.ADMIN, Role.CASHIER, Role.STAFF)
+  getProductStockLogs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 100;
+    return this.productsService.getStockLogs(id, parsedLimit);
+  }
+
+  // ສັ່ງຊື້ສິນຄ້າ / ເພີ່ມສະຕັອກ (Purchase Order / Restock)
+  @Post(':id/restock')
+  @Roles(Role.ADMIN, Role.CASHIER, Role.STAFF)
+  restock(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Body() dto: RestockProductDto,
+  ) {
+    const staffId = req.user?.id || req.user?.sub;
+    return this.productsService.restock(id, Number(staffId), dto);
+  }
+
+  // ປັບປຸງສະຕັອກ / ສິນຄ້າເສຍຫາຍ (Adjust Stock / Out Damage)
+  @Post(':id/adjust-stock')
+  @Roles(Role.ADMIN, Role.CASHIER, Role.STAFF)
+  adjustStock(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+    @Body() dto: AdjustStockDto,
+  ) {
+    const staffId = req.user?.id || req.user?.sub;
+    return this.productsService.adjustStock(id, Number(staffId), dto);
   }
 
   @Get(':id')
@@ -185,7 +225,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN, Role.STAFF) // 👈 ອະນຸຍາດໃຫ້ທັງ ADMIN ແລະ STAFF ສามารถອັບເດດ/ຕັດ Stock ສິນຄ້າໄດ້
+  @Roles(Role.ADMIN, Role.CASHIER, Role.STAFF)
   @UseInterceptors(FileInterceptor('image', multerOptions))
   async update(
     @Param('id', ParseIntPipe) id: number,

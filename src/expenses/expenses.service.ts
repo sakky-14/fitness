@@ -18,10 +18,10 @@ export class ExpensesService {
         staffId,
         title: dto.title,
         category: dto.category || ExpenseCategory.SUPPLIES,
-        amountLak: dto.amountLak,
+        amountLak: Number(dto.amountLak),
         paidCurrency: dto.paidCurrency || Currency.LAK,
-        exchangeRate: dto.exchangeRate || 1,
-        amountPaid: dto.amountPaid,
+        exchangeRate: Number(dto.exchangeRate || 1),
+        amountPaid: dto.amountPaid !== undefined ? Number(dto.amountPaid) : Number(dto.amountLak),
         receiptUrl: dto.receiptUrl || null,
       },
       include: {
@@ -40,7 +40,7 @@ export class ExpensesService {
     });
   }
 
-  // 3. ຄິດໄລ່ຍອດລາຍຈ່າຍລວມ (👈 ເພີ່ມໃໝ່)
+  // 3. ຄິດໄລ່ຍອດລາຍຈ່າຍລວມ
   async getTotalExpense() {
     const result = await this.prisma.expense.aggregate({
       _sum: {
@@ -50,7 +50,51 @@ export class ExpensesService {
     return { totalExpense: result._sum.amountLak || 0 };
   }
 
-  // 4. ດຶງລາຍຈ່າຍຕາມ ID
+  // 4. ສະຫຼຸບລາຍຈ່າຍປະຈຳເດືອນ ແລະ ແຍກຕາມໝວດໝູ່ (Monthly Summary & Categories)
+  async getMonthlySummary(year?: number) {
+    const targetYear = year || new Date().getFullYear();
+    const startDate = new Date(targetYear, 0, 1);
+    const endDate = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+
+    const expenses = await this.prisma.expense.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      totalAmountLak: 0,
+      count: 0,
+    }));
+
+    const byCategory: Record<string, number> = {};
+
+    for (const exp of expenses) {
+      const m = exp.createdAt.getMonth();
+      const amount = Number(exp.amountLak);
+      months[m].totalAmountLak += amount;
+      months[m].count += 1;
+
+      byCategory[exp.category] = (byCategory[exp.category] || 0) + amount;
+    }
+
+    const totalExpense = expenses.reduce((acc, cur) => acc + Number(cur.amountLak), 0);
+
+    return {
+      year: targetYear,
+      totalExpense,
+      totalCount: expenses.length,
+      monthlyBreakdown: months,
+      byCategory,
+    };
+  }
+
+  // 5. ດຶງລາຍຈ່າຍຕາມ ID
   async findOne(id: number) {
     const expense = await this.prisma.expense.findUnique({
       where: { id },
@@ -66,7 +110,7 @@ export class ExpensesService {
     return expense;
   }
 
-  // 5. ແກ້ໄຂລາຍຈ່າຍ
+  // 6. ແກ້ໄຂລາຍຈ່າຍ
   async update(id: number, dto: UpdateExpenseDto) {
     await this.findOne(id);
     return this.prisma.expense.update({
@@ -78,7 +122,7 @@ export class ExpensesService {
     });
   }
 
-  // 6. ລົບລາຍຈ່າຍ (ສະເພາະ ADMIN)
+  // 7. ລົບລາຍຈ່າຍ (ສະເພາະ ADMIN)
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.expense.delete({

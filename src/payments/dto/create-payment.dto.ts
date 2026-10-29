@@ -2,45 +2,49 @@ import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from '
 import { Currency, PaymentMethod } from '@prisma/client';
 
 export class CreatePaymentDto {
-    @IsInt()
-    @IsOptional()
-    memberId?: number; // ID ສະມາຊິກ (ຖ້າເປັນ Walk-in ບໍ່ມີສະມາຊິກ ສາມາດປະว่างไว้ได้)
+  @IsInt()
+  @IsOptional()
+  memberId?: number; // ID ສະມາຊິກ (ຖ້າເປັນ Walk-in ບໍ່ມີສະມາຊິກ ສາມາດປະຫວ່າງໄດ້)
 
-    @IsInt()
-    @IsOptional()
-    packageId?: number; // ID ແພັກເກັດ ຖ້າມີການຊື້ ຫຼື ຕໍ່ອາຍຸ
+  @IsInt()
+  @IsOptional()
+  packageId?: number; // ID ແພັກເກັດ ຖ້າມີການຊື້ ຫຼື ຕໍ່ອາຍຸ
 
-    @IsInt()
-    @IsOptional()
-    productId?: number
+  @IsInt()
+  @IsOptional()
+  productId?: number; // ID ສິນຄ້າ (ຖ້າມີການຊື້ເຄື່ອງດື່ມ/ອາຫານເສີມ)
 
-    @IsString()
-    @IsNotEmpty()
-    description: string; // รายละเอียด เช่น "ต่ออายุบุฟเฟต์ 1 เดือน"
+  @IsInt()
+  @IsOptional()
+  shiftId?: number; // ID ຂອງກະເງິນສົດ (ຖ້າບໍ່ສົ່ງມາ ລະບົບຈະດຶງກະທີ່ເປີດຢູ່ອັດຕະໂນມັດ)
 
-    @IsNumber()
-    @Min(0)
-    amountLak: number; // ราคารวมเป็นเงินกีบ
+  @IsString()
+  @IsNotEmpty()
+  description: string; // ລາຍລະອຽດ ເຊັ່ນ: "ຕໍ່ອາຍຸສະມາຊິກລາຍເດືອນ", "ຊື້ເກເຕີເລດ 1 ຕຸກ"
 
-    @IsEnum(Currency)
-    @IsOptional()
-    paidCurrency?: Currency; // LAK, THB, USD (Default: LAK)
+  @IsNumber()
+  @Min(0)
+  amountLak: number; // ລາຄາລວມທີ່ຕ້ອງຈ່າຍເປັນເງິນກີບ
 
-    @IsNumber()
-    @Min(0)
-    @IsOptional()
-    exchangeRate?: number; // อัตราแลกเปลี่ยน (Default: 1)
+  @IsEnum(Currency)
+  @IsOptional()
+  paidCurrency?: Currency = Currency.LAK; // LAK, THB, USD
 
-    @IsNumber()
-    @Min(0)
-    amountPaid: number; // จำนวนเงินที่ลูกค้าจ่ายมาจริงตาม Currency
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  exchangeRate?: number = 1; // ອັດຕາແລກປ່ຽນ (Default: 1)
 
-    @IsNumber()
-    @Min(0)
-    @IsOptional()
-    changeLak?: number; // เงินทอนเป็นเงินกีบ
+  @IsNumber()
+  @Min(0)
+  amountPaid: number; // ຈຳນວນເງິນທີ່ລູກຄ້າຈ່າຍມາຕົວຈິງຕາມ Currency
 
-    @IsEnum(PaymentMethod)
-    @IsOptional()
-    paymentMethod?: PaymentMethod; // CASH, BCEL_ONE_QR
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  changeLak?: number = 0; // ເງິນທອນເປັນເງິນກີບ
+
+  @IsEnum(PaymentMethod)
+  @IsOptional()
+  paymentMethod?: PaymentMethod = PaymentMethod.CASH; // CASH, BCEL_ONE_QR, BANK_TRANSFER
 }

@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,51 +9,148 @@ datasource db {
   provider = "postgresql"
 }
 
+// 1. Roles & Permissions (ADMIN, CASHIER, TRAINER, STAFF for full backward compatibility)
 enum Role {
   ADMIN
+  CASHIER
+  TRAINER
   STAFF
 }
 
+// 2. Currencies
 enum Currency {
   LAK
   THB
   USD
 }
 
+// 3. Payment Methods (CASH, BCEL_ONE_QR, BANK_TRANSFER)
 enum PaymentMethod {
   CASH
   BCEL_ONE_QR
+  BANK_TRANSFER
 }
 
+// 4. Expense Categories
 enum ExpenseCategory {
   SUPPLIES
   UTILITIES
   MAINTENANCE
+  SALARY
+  MARKETING
+  RENT
   MISCELLANEOUS
 }
 
-// 1. พนักงาน / ผู้จัดการยิม (Auth & Staff)
+// 5. Shift Status
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+// 6. Package Types
+enum PackageType {
+  TIME_BASED
+  SESSION_BASED
+  DAY_PASS
+  PT_ONLY
+}
+
+// 7. PT Session Status
+enum PTSessionStatus {
+  COMPLETED
+  CANCELLED
+}
+
+// 8. Stock Log Types
+enum StockLogType {
+  IN_PURCHASE
+  OUT_SALE
+  OUT_DAMAGE
+  ADJUSTMENT
+}
+
+// ----------------------------------------------------
+// MODELS
+// ----------------------------------------------------
+
+// 1. ພະນັກງານ / ຜູ້ຈັດການ / ແຄັດເຊຍ / ເທຣນເນີ (User)
 model User {
   id           Int       @id @default(autoincrement())
   name         String
   phone        String    @unique
   passwordHash String
-  role         Role      @default(STAFF)
-  payments     Payment[]
-  expenses     Expense[]
+  role         Role      @default(CASHIER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  payments       Payment[]
+  expenses       Expense[]
+  shiftsOpened   Shift[]         @relation("ShiftOpenedBy")
+  shiftsClosed   Shift[]         @relation("ShiftClosedBy")
+  stockLogs      StockLog[]
+  loginAuditLogs LoginAuditLog[]
+  trainerProfile Trainer?
 }
 
-// 2. แพ็กเกจยิม (รายวัน, บุฟเฟต์รายเดือน, คูปองนับครั้ง)
+// 2. Login Audit Log (ບັນທຶກປະຫວັດການເຂົ້າສູ່ລະບົບ)
+model LoginAuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  loginAt   DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// 3. Shift Management (ການເປີດ-ປິດກະເງິນສົດ)
+model Shift {
+  id               Int         @id @default(autoincrement())
+  openedById       Int
+  closedById       Int?
+  openedAt         DateTime    @default(now())
+  closedAt         DateTime?
+  startCashLak     Decimal     @default(0) @db.Decimal(12, 2)
+  startCashThb     Decimal     @default(0) @db.Decimal(12, 2)
+  startCashUsd     Decimal     @default(0) @db.Decimal(12, 2)
+  actualCashLak    Decimal?    @db.Decimal(12, 2)
+  actualCashThb    Decimal?    @db.Decimal(12, 2)
+  actualCashUsd    Decimal?    @db.Decimal(12, 2)
+  expectedCashLak  Decimal?    @db.Decimal(12, 2)
+  expectedCashThb  Decimal?    @db.Decimal(12, 2)
+  expectedCashUsd  Decimal?    @db.Decimal(12, 2)
+  differenceLak    Decimal?    @db.Decimal(12, 2)
+  status           ShiftStatus @default(OPEN)
+  notes            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  openedBy User      @relation("ShiftOpenedBy", fields: [openedById], references: [id])
+  closedBy User?     @relation("ShiftClosedBy", fields: [closedById], references: [id])
+  payments Payment[]
+}
+
+// 4. ແພັກເກັດຍິມ (Packages: Time-based, Session-based, Day-pass, PT-only)
 model Package {
-  id           Int      @id @default(autoincrement())
-  name         String
-  priceLak     Decimal  @db.Decimal(12, 2)
-  durationDays Int?
-  sessions     Int?
-  members      Member[]
+  id            Int         @id @default(autoincrement())
+  name          String
+  type          PackageType @default(TIME_BASED)
+  priceLak      Decimal     @db.Decimal(12, 2)
+  durationDays  Int?
+  durationHours Int?
+  sessions      Int?
+  ptHours       Decimal?    @db.Decimal(5, 2)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  members        Member[]
+  memberPackages MemberPackage[]
+  payments       Payment[]
 }
 
-// 3. สมาชิกยิม และสิทธิ์การเข้าใช้งาน (Member & Access)
+// 5. ສະມາຊິກຍິມ (Member)
 model Member {
   id                Int       @id @default(autoincrement())
   code              String    @unique
@@ -66,36 +161,117 @@ model Member {
   expireDate        DateTime?
   remainingSessions Int?      @default(0)
   lastCheckIn       DateTime?
+  isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  package  Package?  @relation(fields: [packageId], references: [id])
-  payments Payment[]
+  package        Package?        @relation(fields: [packageId], references: [id])
+  payments       Payment[]
+  memberPackages MemberPackage[]
+  ptSessions     PTSession[]
+  checkIns       CheckIn[]
 }
 
+// 6. ແພັກເກັດທີ່ສະມາຊິກຖືຄອງ (MemberPackage: ຮອງຮັບຫຼາຍແພັກເກັດ & PT)
+model MemberPackage {
+  id                Int       @id @default(autoincrement())
+  memberId          Int
+  packageId         Int
+  startDate         DateTime  @default(now())
+  expireDate        DateTime?
+  totalSessions     Int?      @default(0)
+  remainingSessions Int?      @default(0)
+  totalPtHours      Decimal?  @default(0) @db.Decimal(5, 2)
+  remainingPtHours  Decimal?  @default(0) @db.Decimal(5, 2)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  package    Package     @relation(fields: [packageId], references: [id])
+  ptSessions PTSession[]
+}
+
+// 7. ເທຣນເນີ / ຄູຝຶກສອນ (Trainer)
+model Trainer {
+  id             Int      @id @default(autoincrement())
+  userId         Int?     @unique
+  fullName       String
+  phone          String   @unique
+  specialty      String?
+  commissionRate Decimal  @default(0) @db.Decimal(5, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User?       @relation(fields: [userId], references: [id])
+  ptSessions PTSession[]
+}
+
+// 8. ບັນທຶກການສອນ PT (Personal Training Session)
+model PTSession {
+  id               Int             @id @default(autoincrement())
+  memberId         Int
+  trainerId        Int
+  memberPackageId  Int?
+  hoursDeducted    Decimal         @default(1.0) @db.Decimal(4, 2)
+  sessionDate      DateTime        @default(now())
+  commissionEarned Decimal?        @db.Decimal(12, 2)
+  status           PTSessionStatus @default(COMPLETED)
+  notes            String?
+  createdAt        DateTime        @default(now())
+
+  member        Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  trainer       Trainer        @relation(fields: [trainerId], references: [id])
+  memberPackage MemberPackage? @relation(fields: [memberPackageId], references: [id])
+}
+
+// 9. ສິນຄ້າ & ມິນິບາຣ໌ (Product)
 model Product {
   id           Int      @id @default(autoincrement())
   barcode      String?  @unique
   name         String
-  category     String? // ເກັບເປັນ String ກົງໆ ເຊັ່ນ: "Drinks", "Supplements" (ບໍ່ຕ້ອງມີຕາຕະລາງ Category)
-  costPriceLak Decimal  @db.Decimal(12, 2) // ຕົ້ນທຶນ
-  priceLak     Decimal  @db.Decimal(12, 2) // ລາຄາຂາຍ
-  stock        Int      @default(0) // ຈຳນວນໃນສະຕັອກ
-  imageUrl     String? // ເກັບ Path URL / UUID ຮູບພາບ
+  category     String?
+  costPriceLak Decimal  @db.Decimal(12, 2)
+  priceLak     Decimal  @db.Decimal(12, 2)
+  stock        Int      @default(0)
+  imageUrl     String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  payments Payment[] // ຖ້າຕ້ອງການເຊື່ອມກັບ Payment
+  payments  Payment[]
+  stockLogs StockLog[]
 }
 
-// 4. บันทึกการรับเงินทุกประเภท (Payments & Multi-Currency)
+// 10. ປະຫວັດສະຕັອກສິນຄ້າ / ໃບສັ່ງຊື້ (StockLog)
+model StockLog {
+  id            Int          @id @default(autoincrement())
+  productId     Int
+  staffId       Int
+  type          StockLogType
+  quantity      Int
+  previousStock Int
+  newStock      Int
+  unitCostLak   Decimal?     @db.Decimal(12, 2)
+  totalCostLak  Decimal?     @db.Decimal(12, 2)
+  supplier      String?
+  reference     String?
+  reason        String?
+  createdAt     DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  staff   User    @relation(fields: [staffId], references: [id])
+}
+
+// 11. ບັນທຶກການຮັບເງິນ (Payment)
 model Payment {
   id            Int           @id @default(autoincrement())
   staffId       Int
+  shiftId       Int?
   memberId      Int?
-  // 👈 ຕ້ອງມີ 2 ແຖວນີ້ຄູ່ກັນ
+  packageId     Int?
   productId     Int?
-  product       Product?      @relation(fields: [productId], references: [id])
   description   String
   amountLak     Decimal       @db.Decimal(12, 2)
   paidCurrency  Currency      @default(LAK)
@@ -105,11 +281,14 @@ model Payment {
   paymentMethod PaymentMethod @default(CASH)
   createdAt     DateTime      @default(now())
 
-  staff  User    @relation(fields: [staffId], references: [id])
-  member Member? @relation(fields: [memberId], references: [id])
+  staff   User     @relation(fields: [staffId], references: [id])
+  shift   Shift?   @relation(fields: [shiftId], references: [id])
+  member  Member?  @relation(fields: [memberId], references: [id])
+  package Package? @relation(fields: [packageId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
 }
 
-// 5. บันทึกรายจ่ายหน้าร้านและเงินสดย่อย (Expense & Petty Cash)
+// 12. ບັນທຶກລາຍຈ່າຍ (Expense)
 model Expense {
   id           Int             @id @default(autoincrement())
   staffId      Int
@@ -123,4 +302,14 @@ model Expense {
   createdAt    DateTime        @default(now())
 
   staff User @relation(fields: [staffId], references: [id])
+}
+
+// 13. ປະຫວັດການ Check-in (CheckIn)
+model CheckIn {
+  id        Int      @id @default(autoincrement())
+  memberId  Int
+  checkInAt DateTime @default(now())
+  notes     String?
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
